@@ -40,7 +40,7 @@ const credentialsSchema = z.object({
 export const authOptions: NextAuthOptions = {
   session: { 
     strategy: "jwt",
-    maxAge: 15 * 60, // 减少到15分钟
+    maxAge: 10 * 60, // 进一步减少到10分钟
   },
   debug: false,
   useSecureCookies: false,
@@ -56,13 +56,23 @@ export const authOptions: NextAuthOptions = {
         sameSite: "lax",
         path: "/",
         secure: false,
-        maxAge: 15 * 60, // 15分钟
+        maxAge: 10 * 60, // 10分钟
+      },
+    },
+    csrfToken: {
+      name: "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+        maxAge: 10 * 60, // 10分钟
       },
     },
   },
   callbacks: {
     async jwt({ token, user }) {
-      // 极简化token内容
+      // 最小化token内容
       if (user) {
         token.sub = user.id;
         token.email = user.email;
@@ -70,7 +80,7 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // 极简化session内容
+      // 最小化session内容
       if (token && session.user) {
         session.user.id = token.sub as string;
         session.user.email = token.email as string;
