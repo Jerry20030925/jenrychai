@@ -1,5 +1,6 @@
 // Supabase 客户端配置
 import { createClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://nhxgpiwowhoqlyejrelj.supabase.co';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5oeGdwaXdvd2hvcWx5ZWpyZWxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3MTg4ODQsImV4cCI6MjA3NTI5NDg4NH0.SAvlMRnsPVujWGdJvAmTyYJJi1qs1egx-LT23vzGyu4';
@@ -28,12 +29,18 @@ export const userOperations = {
     bio?: string;
     image?: string;
   }) {
+    // 确保密码被正确加密
+    let hashedPassword = userData.passwordHash;
+    if (userData.password && !hashedPassword) {
+      hashedPassword = await bcrypt.hash(userData.password, 10);
+    }
+
     const { data, error } = await supabase
       .from('users')
       .insert([{
         email: userData.email,
-        password: userData.password,
-        password_hash: userData.passwordHash,
+        password: hashedPassword, // 存储加密后的密码
+        password_hash: hashedPassword, // 同时存储到 password_hash 字段
         name: userData.name,
         phone: userData.phone,
         bio: userData.bio,
