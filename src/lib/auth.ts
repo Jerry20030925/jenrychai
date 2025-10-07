@@ -119,7 +119,14 @@ export const authOptions: NextAuthOptions = {
           const user = await findUserByEmail(email);
           if (user) {
             console.log("👤 Found user:", user.email);
-            const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+            // 检查密码字段，优先使用 passwordHash，回退到 password
+            const passwordToCheck = user.passwordHash || user.password;
+            if (!passwordToCheck) {
+              console.log("❌ No password found for user:", email);
+              throw new Error("用户密码未设置");
+            }
+            
+            const isValidPassword = await bcrypt.compare(password, passwordToCheck);
             if (isValidPassword) {
               console.log("✅ User login successful");
               return {
