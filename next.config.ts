@@ -16,23 +16,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   generateEtags: false,
   // 减少响应头大小 - 已移动到 serverExternalPackages
-  // 域名重定向和安全头
-  async redirects() {
-    return [
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.jenrychai.com',
-          },
-        ],
-        destination: 'https://jenrychai.com/:path*',
-        permanent: true,
-      },
-    ];
-  },
-  // 优化静态资源缓存
+  // 移除重定向规则以避免循环
+  // async redirects() {
+  //   return [];
+  // },
+  // 简化headers配置以避免重定向问题
   async headers() {
     return [
       {
@@ -41,14 +29,6 @@ const nextConfig: NextConfig = {
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
           },
         ],
       },
