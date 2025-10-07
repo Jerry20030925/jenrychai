@@ -1,8 +1,19 @@
 // Supabase 客户端配置
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://nhxgpiwowhoqlyejrelj.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5oeGdwaXdvd2hvcWx5ZWpyZWxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3MTg4ODQsImV4cCI6MjA3NTI5NDg4NH0.SAvlMRnsPVujWGdJvAmTyYJJi1qs1egx-LT23vzGyu4';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://nhxgpiwowhoqlyejrelj.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5oeGdwaXdvd2hvcWx5ZWpyZWxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3MTg4ODQsImV4cCI6MjA3NTI5NDg4NH0.SAvlMRnsPVujWGdJvAmTyYJJi1qs1egx-LT23vzGyu4';
+
+console.log('🔧 Supabase 配置:', {
+  url: supabaseUrl,
+  hasAnonKey: !!supabaseAnonKey,
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_URL: !!process.env.SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY
+  }
+});
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
