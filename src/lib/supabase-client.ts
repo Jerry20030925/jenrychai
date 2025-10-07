@@ -101,7 +101,15 @@ export const userOperations = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    
+    // 转换字段名为前端期望的格式
+    return (data || []).map(user => ({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at
+    }));
   }
 };
 
