@@ -325,26 +325,20 @@ export async function POST(request: Request): Promise<Response> {
           const fullText = typeof (last as any).content === "string" ? (last as any).content : "";
           const mergedText = fileText ? `${fullText}\n\n${fileText}` : fullText;
           textParts.push({ type: "text", text: mergedText });
-                  // 图片部分 - 异步分析图片，不阻塞主流程
+                  // 图片部分 - 同步分析图片，确保AI能看到图片内容
                   if (imgs.length > 0) {
-                    // 先添加占位符，让AI知道有图片
-                    textParts.push({
-                      type: "text",
-                      text: `\n\n[用户上传了 ${imgs.length} 张图片，正在分析中...]`
-                    });
+                    try {
+                      console.log("🖼️ 开始分析图片，数量:", imgs.length);
 
-                    // 异步分析图片，不阻塞响应
-                    setImmediate(async () => {
-                      try {
-                        console.log("🖼️ 开始异步分析图片，数量:", imgs.length);
-
-                        // 检查是否有OpenAI API密钥
-                        const openaiKey = process.env.OPENAI_API_KEY;
-                        if (!openaiKey || openaiKey.length < 20) {
-                          console.log("⚠️ OpenAI API密钥无效，跳过图片分析");
-                          return;
-                        }
-
+                      // 检查是否有OpenAI API密钥
+                      const openaiKey = process.env.OPENAI_API_KEY;
+                      if (!openaiKey || openaiKey.length < 20) {
+                        console.log("⚠️ OpenAI API密钥无效，跳过图片分析");
+                        textParts.push({
+                          type: "text",
+                          text: `\n\n[用户上传了 ${imgs.length} 张图片，但图片分析服务不可用]`
+                        });
+                      } else {
                         // 使用OpenAI Vision API分析图片
                         const openaiVision = new OpenAI({
                           apiKey: process.env.OPENAI_API_KEY,
@@ -367,38 +361,49 @@ export async function POST(request: Request): Promise<Response> {
 
                         if (validImgs.length === 0) {
                           console.log("⚠️ 没有有效的图片格式");
-                          return;
+                          textParts.push({
+                            type: "text",
+                            text: `\n\n[用户上传了 ${imgs.length} 张图片，但格式不支持]`
+                          });
+                        } else {
+                          // 同步分析图片
+                          const visionCompletion = await openaiVision.chat.completions.create({
+                            model: "gpt-4o",
+                            messages: [
+                              {
+                                role: "user",
+                                content: [
+                                  {
+                                    type: "text",
+                                    text: "请详细分析这些图片的内容，包括：1. 图片中显示的主要物体和文字 2. 颜色和构图 3. 可能的用途或场景。请用中文回答，要准确描述图片内容。"
+                                  },
+                                  ...validImgs.slice(0, 2).map(imgUrl => ({ // 限制最多2张图片
+                                    type: "image_url" as const,
+                                    image_url: { url: imgUrl }
+                                  }))
+                                ]
+                              }
+                            ],
+                            max_tokens: 1000
+                          });
+
+                          const visionAnalysis = visionCompletion.choices[0]?.message?.content || "无法分析图片内容";
+                          console.log("✅ 图片分析完成:", visionAnalysis.substring(0, 100) + "...");
+                          
+                          // 将图片分析结果添加到消息中
+                          textParts.push({
+                            type: "text",
+                            text: `\n\n[图片分析结果：${visionAnalysis}]`
+                          });
                         }
-
-                        const visionCompletion = await openaiVision.chat.completions.create({
-                          model: "gpt-4o",
-                          messages: [
-                            {
-                              role: "user",
-                              content: [
-                                {
-                                  type: "text",
-                                  text: "请简要分析这些图片的主要内容。"
-                                },
-                                ...validImgs.slice(0, 2).map(imgUrl => ({ // 限制最多2张图片
-                                  type: "image_url" as const,
-                                  image_url: { url: imgUrl }
-                                }))
-                              ]
-                            }
-                          ],
-                          max_tokens: 500 // 减少token数量提高速度
-                        });
-
-                        const visionAnalysis = visionCompletion.choices[0]?.message?.content || "无法分析图片内容";
-                        console.log("✅ 图片分析完成:", visionAnalysis.substring(0, 100) + "...");
-                        
-                        // 这里可以发送WebSocket消息或通过其他方式通知前端图片分析结果
-                        // 暂时只记录日志
-                      } catch (visionError) {
-                        console.error("❌ 图片分析失败:", visionError);
                       }
-                    });
+                    } catch (visionError) {
+                      console.error("❌ 图片分析失败:", visionError);
+                      textParts.push({
+                        type: "text",
+                        text: `\n\n[用户上传了 ${imgs.length} 张图片，但分析失败]`
+                      });
+                    }
                   }
           oaMessages[lastIndex] = { role: "user", content: textParts } as any;
         }
