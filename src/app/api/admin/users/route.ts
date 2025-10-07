@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       error: '获取用户数据失败',
-      message: error instanceof Error ? error.message : String(error)
+      message: error instanceof Error ? error.message : JSON.stringify(error),
+      details: error
     }, { status: 500 });
   }
 }
