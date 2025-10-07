@@ -498,48 +498,31 @@ export default function AccountPage() {
           )}
         </motion.div>
 
-        {/* 免责声明 */}
+        {/* AI使用提醒 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="mt-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-6"
+          className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-6"
         >
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-6 h-6 bg-amber-100 dark:bg-amber-900/40 rounded-full flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-600 dark:text-amber-400">
+            <div className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600 dark:text-blue-400">
                 <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-100 mb-3">
-                重要免责声明
+              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">
+                AI使用提醒
               </h3>
-              <div className="space-y-3 text-sm text-amber-800 dark:text-amber-200">
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-600 dark:text-amber-400 font-medium">⚠️</span>
-                  <p>
-                    <strong>AI可能犯错：</strong>本平台使用的人工智能技术可能产生不准确、不完整或误导性的信息。请始终验证重要信息的准确性。
-                  </p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-600 dark:text-amber-400 font-medium">🔍</span>
-                  <p>
-                    <strong>请核实重要信息：</strong>对于医疗、法律、财务等关键决策，请咨询相关专业人士，不要仅依赖AI生成的内容。
-                  </p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-600 dark:text-amber-400 font-medium">🛡️</span>
-                  <p>
-                    <strong>数据安全：</strong>我们采用加密技术保护您的数据，但请避免在对话中分享敏感的个人信息或机密数据。
-                  </p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-600 dark:text-amber-400 font-medium">📝</span>
-                  <p>
-                    <strong>使用条款：</strong>使用本服务即表示您理解并同意上述条款。我们保留随时修改服务条款的权利。
-                  </p>
-                </div>
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="font-medium">
+                  ⚠️ AI可能会犯错，请检查重要信息
+                </p>
+                <p className="mt-2 text-blue-700 dark:text-blue-300">
+                  本平台使用人工智能技术，生成的内容可能存在不准确、不完整或误导性的信息。
+                  对于重要决策，请通过其他渠道验证信息的准确性，并咨询相关专业人士。
+                </p>
               </div>
             </div>
           </div>

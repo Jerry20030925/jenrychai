@@ -66,7 +66,10 @@ class MultimodalAnalyzer {
 
   // 图片分析 - 使用OpenAI Vision
   private async analyzeImage(file: File): Promise<AnalysisResult> {
-    const imageUrl = await this.fileToDataURL(file);
+    // 将文件转换为base64
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    const mimeType = file.type;
     
     const response = await this.openai.chat.completions.create({
       model: "gpt-4o",
@@ -81,7 +84,7 @@ class MultimodalAnalyzer {
             {
               type: "image_url",
               image_url: {
-                url: imageUrl,
+                url: `data:${mimeType};base64,${base64}`,
                 detail: "high"
               }
             }
@@ -113,59 +116,58 @@ class MultimodalAnalyzer {
     };
   }
 
-  // 视频分析 - 提取关键帧进行分析
+  // 视频分析 - 简化实现
   private async analyzeVideo(file: File): Promise<AnalysisResult> {
-    // 这里需要实现视频关键帧提取
-    // 由于浏览器限制，我们使用简化的方法
-    const videoUrl = await this.fileToDataURL(file);
-    
-    // 创建视频元素来获取基本信息
-    const video = document.createElement('video');
-    video.src = videoUrl;
-    
-    return new Promise((resolve) => {
-      video.onloadedmetadata = async () => {
-        const duration = video.duration;
-        
-        // 提取多个关键帧进行分析
-        const keyFrames = await this.extractVideoKeyFrames(video);
-        const frameAnalyses = await Promise.all(
-          keyFrames.map(frame => this.analyzeImageFrame(frame))
-        );
-        
-        const combinedAnalysis = this.combineVideoAnalyses(frameAnalyses, duration);
-        
-        resolve({
-          type: 'video',
-          title: `视频分析 - ${file.name}`,
-          summary: combinedAnalysis.summary,
-          keyPoints: combinedAnalysis.keyPoints,
-          insights: combinedAnalysis.insights,
-          metadata: {
-            duration,
-            size: file.size,
-            format: file.type
-          },
-          visualElements: combinedAnalysis.visualElements,
-          timestamp: new Date().toISOString()
-        });
-      };
-    });
+    // 简化实现：返回基本信息
+    return {
+      type: 'video',
+      title: `视频分析 - ${file.name}`,
+      summary: '视频文件已上传，但由于技术限制，暂不支持视频内容分析。',
+      keyPoints: ['视频文件已接收', '暂不支持内容分析'],
+      insights: ['建议使用图片或PDF文件进行分析'],
+      metadata: {
+        size: file.size,
+        format: file.type
+      },
+      timestamp: new Date().toISOString()
+    };
   }
 
-  // PDF分析 - 使用文本提取和AI分析
+  // PDF分析 - 使用OpenAI Vision API
   private async analyzePDF(file: File): Promise<AnalysisResult> {
-    const text = await this.extractPDFText(file);
+    // 将PDF转换为base64用于Vision API分析
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
     
     const response = await this.openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
           role: "user",
-          content: `请分析以下PDF文档内容，提供：1. 文档摘要 2. 主要观点 3. 关键信息 4. 实用建议。请用中文回答，结构清晰。\n\n文档内容：\n${text}`
+          content: [
+            {
+              type: "text",
+              text: `请详细分析这个PDF文件的内容。请提供：
+1. 文档摘要（2-3句话）
+2. 主要章节和结构
+3. 关键信息和数据
+4. 重要观点和结论
+5. 实用建议和行动项
+6. 文档类型和用途
+
+请用中文回答，结构清晰，重点突出。如果PDF内容无法清晰读取，请说明原因并提供建议。`
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:application/pdf;base64,${base64}`
+              }
+            }
+          ]
         }
       ],
-      max_tokens: 2000
+      max_tokens: 2000,
+      temperature: 0.3
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -179,7 +181,7 @@ class MultimodalAnalyzer {
       metadata: {
         size: file.size,
         format: file.type,
-        pages: this.estimatePDFPages(text)
+        pages: 1 // Vision API无法直接获取页数
       },
       timestamp: new Date().toISOString()
     };
@@ -278,14 +280,6 @@ class MultimodalAnalyzer {
   }
 
   // 辅助方法
-  private async fileToDataURL(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
 
   private extractSummary(content: string): string {
     const lines = content.split('\n');
@@ -331,54 +325,6 @@ class MultimodalAnalyzer {
     return emotionMatches.map(emotion => emotion.trim()).filter(emotion => emotion.length > 0);
   }
 
-  private async extractVideoKeyFrames(video: HTMLVideoElement): Promise<string[]> {
-    // 简化的关键帧提取 - 实际应用中需要更复杂的算法
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d')!;
-    const frames: string[] = [];
-    
-    const duration = video.duration;
-    const frameCount = Math.min(5, Math.floor(duration / 10)); // 每10秒一帧，最多5帧
-    
-    for (let i = 0; i < frameCount; i++) {
-      const time = (duration / frameCount) * i;
-      video.currentTime = time;
-      
-      await new Promise(resolve => {
-        video.onseeked = () => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0);
-          frames.push(canvas.toDataURL());
-          resolve(void 0);
-        };
-      });
-    }
-    
-    return frames;
-  }
-
-  private async analyzeImageFrame(frameDataUrl: string): Promise<any> {
-    // 这里可以调用图片分析API
-    // 简化实现
-    return {
-      summary: '视频帧分析',
-      keyPoints: ['关键帧内容'],
-      insights: ['视频内容洞察']
-    };
-  }
-
-  private combineVideoAnalyses(analyses: any[], duration: number): any {
-    return {
-      summary: `视频总时长 ${Math.round(duration)} 秒，包含多个关键场景`,
-      keyPoints: analyses.flatMap(a => a.keyPoints),
-      insights: analyses.flatMap(a => a.insights),
-      visualElements: {
-        objects: analyses.flatMap(a => a.visualElements?.objects || []),
-        emotions: analyses.flatMap(a => a.visualElements?.emotions || [])
-      }
-    };
-  }
 
   private async extractPDFText(file: File): Promise<string> {
     // 简化的PDF文本提取
@@ -412,11 +358,8 @@ class MultimodalAnalyzer {
   }
 
   private async getAudioDuration(file: File): Promise<number> {
-    return new Promise((resolve) => {
-      const audio = new Audio();
-      audio.onloadedmetadata = () => resolve(audio.duration);
-      audio.src = URL.createObjectURL(file);
-    });
+    // 简化实现：返回0
+    return 0;
   }
 
   private async extractWebpageContent(url: string): Promise<string> {
