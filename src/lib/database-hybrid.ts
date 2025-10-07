@@ -1,5 +1,6 @@
-// 混合数据库存储方案 - 内存存储 + 数据库备份
+// 混合数据库存储方案 - Supabase REST API + 内存存储备份
 import { PrismaClient } from '@prisma/client';
+import { userOperations, conversationOperations, messageOperations, memoryOperations } from './supabase-client';
 
 // 使用全局变量来保持内存状态（避免热重载导致数据丢失）
 declare global {
@@ -107,44 +108,71 @@ export async function createUser(email: string, passwordHash: string, name: stri
     updatedAt: now
   };
   
-  // 优先存储到Supabase数据库
-  if (prisma && !dbConnectionFailed) {
-    try {
-      await prisma.user.create({
-        data: {
-          id,
-          email,
-          passwordHash,
-          name,
-          phone: phone || null,
-          bio: bio || null,
-          image
-        } as any
-      });
-      console.log('✅ 用户已创建到Supabase数据库');
-      // 同时更新内存存储作为缓存
-      memoryUsers.set(id, user);
-    } catch (error) {
-      console.log('❌ 用户创建到Supabase数据库失败:', error);
-      dbConnectionFailed = true;
-      // 数据库失败时使用内存存储
+  // 首先尝试使用 Supabase REST API
+  try {
+    const supabaseUser = await userOperations.create({
+      email,
+      passwordHash,
+      name,
+      phone,
+      bio,
+      image
+    });
+    console.log('✅ 用户已保存到 Supabase:', supabaseUser.email);
+    return supabaseUser;
+  } catch (error) {
+    console.log('❌ Supabase 保存失败，尝试数据库:', error instanceof Error ? error.message : String(error));
+    
+    // 回退到 Prisma 数据库
+    if (prisma && !dbConnectionFailed) {
+      try {
+        await prisma.user.create({
+          data: {
+            id,
+            email,
+            passwordHash,
+            name,
+            phone: phone || null,
+            bio: bio || null,
+            image
+          } as any
+        });
+        console.log('✅ 用户已创建到数据库');
+        // 同时更新内存存储作为缓存
+        memoryUsers.set(id, user);
+      } catch (dbError) {
+        console.log('❌ 数据库创建失败，使用内存存储:', dbError);
+        dbConnectionFailed = true;
+        // 数据库失败时使用内存存储
+        memoryUsers.set(id, user);
+      }
+    } else {
+      // 数据库不可用时使用内存存储
       memoryUsers.set(id, user);
     }
-  } else {
-    // 数据库不可用时使用内存存储
-    memoryUsers.set(id, user);
   }
   
   return user;
 }
 
 export async function findUserByEmail(email: string) {
-  // 优先从Supabase数据库查找
+  // 首先尝试从 Supabase REST API 查找
+  try {
+    const supabaseUser = await userOperations.findByEmail(email);
+    if (supabaseUser) {
+      console.log('✅ 从 Supabase 找到用户:', email);
+      return supabaseUser;
+    }
+  } catch (error) {
+    console.log('❌ Supabase 查询失败，尝试数据库:', error instanceof Error ? error.message : String(error));
+  }
+  
+  // 回退到 Prisma 数据库
   if (prisma && !dbConnectionFailed) {
     try {
       const dbUser = await prisma.user.findUnique({ where: { email } });
       if (dbUser) {
-        console.log('✅ 从Supabase数据库找到用户:', email);
+        console.log('✅ 从数据库找到用户:', email);
         // 同步到内存作为缓存
         memoryUsers.set(dbUser.id, {
           id: dbUser.id,
@@ -161,7 +189,7 @@ export async function findUserByEmail(email: string) {
         return memoryUsers.get(dbUser.id);
       }
     } catch (error: unknown) {
-      console.log('❌ Supabase数据库查询失败:', error instanceof Error ? error.message : String(error));
+      console.log('❌ 数据库查询失败:', error instanceof Error ? error.message : String(error));
       dbConnectionFailed = true;
     }
   }

@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { userOperations } from '@/lib/supabase-client';
 
 export async function GET(request: NextRequest) {
   try {
-    const prisma = new PrismaClient();
-
-    // 获取所有用户
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        createdAt: true,
-        updatedAt: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    await prisma.$disconnect();
-
+    // 使用 Supabase REST API 获取所有用户
+    const users = await userOperations.findAll();
     return NextResponse.json(users);
 
   } catch (error) {
