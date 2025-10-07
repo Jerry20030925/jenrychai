@@ -20,5 +20,18 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "regions": ["syd1"]
+  "regions": ["syd1"],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.jenrychai.com"
+        }
+      ],
+      "destination": "https://jenrychai.com/$1",
+      "permanent": true
+    }
+  ]
 }
