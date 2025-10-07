@@ -1,0 +1,15 @@
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Jenrych text with rainbow gradient -->
+  <text x="10" y="28" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="url(#rainbowGradient)">Jenrych</text>
+  
+  <defs>
+    <linearGradient id="rainbowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
+      <stop offset="20%" style="stop-color:#eab308;stop-opacity:1" />
+      <stop offset="40%" style="stop-color:#22c55e;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="80%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>

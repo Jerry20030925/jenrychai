@@ -1,0 +1,291 @@
+/* 情绪动画样式 */
+
+/* 基础表情动画 */
+.emotion-emoji {
+  display: inline-block;
+  transition: all 0.3s ease-in-out;
+  animation-duration: 0.6s;
+  animation-fill-mode: both;
+}
+
+/* 强度动画 */
+.high-intensity {
+  animation: pulse 2s infinite;
+}
+
+.medium-intensity {
+  animation: gentle-bounce 3s infinite;
+}
+
+.low-intensity {
+  animation: subtle-float 4s infinite;
+}
+
+/* 情绪特定动画 */
+.emotion-happy {
+  animation: happy-bounce 0.8s ease-out;
+}
+
+.emotion-excited {
+  animation: excited-shake 0.6s ease-out;
+}
+
+.emotion-love {
+  animation: love-heartbeat 1.2s ease-out;
+}
+
+.emotion-grateful {
+  animation: grateful-nod 0.7s ease-out;
+}
+
+.emotion-sad {
+  animation: sad-sway 1s ease-out;
+}
+
+.emotion-angry {
+  animation: angry-shake 0.5s ease-out;
+}
+
+.emotion-worried {
+  animation: worried-tremble 0.8s ease-out;
+}
+
+.emotion-confused {
+  animation: confused-tilt 0.9s ease-out;
+}
+
+.emotion-thinking {
+  animation: thinking-rotate 1.5s ease-out;
+}
+
+.emotion-technical {
+  animation: technical-glow 1s ease-out;
+}
+
+.emotion-learning {
+  animation: learning-grow 1.1s ease-out;
+}
+
+.emotion-creative {
+  animation: creative-sparkle 1.3s ease-out;
+}
+
+.emotion-apologetic {
+  animation: apologetic-bow 0.8s ease-out;
+}
+
+.emotion-congratulatory {
+  animation: congratulatory-celebration 1.5s ease-out;
+}
+
+.emotion-helpful {
+  animation: helpful-glow 1s ease-out;
+}
+
+.emotion-warning {
+  animation: warning-flash 0.7s ease-out;
+}
+
+/* 关键帧动画定义 */
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes gentle-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes subtle-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(2deg); }
+}
+
+@keyframes happy-bounce {
+  0% { transform: scale(0.8) translateY(0); }
+  50% { transform: scale(1.2) translateY(-10px); }
+  100% { transform: scale(1) translateY(0); }
+}
+
+@keyframes excited-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px) rotate(-5deg); }
+  75% { transform: translateX(3px) rotate(5deg); }
+}
+
+@keyframes love-heartbeat {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.3); }
+  50% { transform: scale(1.1); }
+  75% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+@keyframes grateful-nod {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(-10deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes sad-sway {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-5deg); }
+  75% { transform: rotate(5deg); }
+}
+
+@keyframes angry-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+@keyframes worried-tremble {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(-1px) translateY(-1px); }
+  50% { transform: translateX(1px) translateY(1px); }
+  75% { transform: translateX(-1px) translateY(1px); }
+}
+
+@keyframes confused-tilt {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-15deg); }
+  75% { transform: rotate(15deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes thinking-rotate {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes technical-glow {
+  0% { 
+    transform: scale(1);
+    filter: drop-shadow(0 0 5px currentColor);
+  }
+  50% { 
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 15px currentColor);
+  }
+  100% { 
+    transform: scale(1);
+    filter: drop-shadow(0 0 5px currentColor);
+  }
+}
+
+@keyframes learning-grow {
+  0% { transform: scale(0.8); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+@keyframes creative-sparkle {
+  0% { 
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 5px currentColor);
+  }
+  25% { 
+    transform: scale(1.1) rotate(90deg);
+    filter: drop-shadow(0 0 10px currentColor);
+  }
+  50% { 
+    transform: scale(1.2) rotate(180deg);
+    filter: drop-shadow(0 0 15px currentColor);
+  }
+  75% { 
+    transform: scale(1.1) rotate(270deg);
+    filter: drop-shadow(0 0 10px currentColor);
+  }
+  100% { 
+    transform: scale(1) rotate(360deg);
+    filter: drop-shadow(0 0 5px currentColor);
+  }
+}
+
+@keyframes apologetic-bow {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(-20deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes congratulatory-celebration {
+  0% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.3) rotate(10deg); }
+  50% { transform: scale(1.1) rotate(-10deg); }
+  75% { transform: scale(1.2) rotate(5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes helpful-glow {
+  0% { 
+    transform: scale(1);
+    filter: drop-shadow(0 0 3px currentColor);
+  }
+  50% { 
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+  100% { 
+    transform: scale(1);
+    filter: drop-shadow(0 0 3px currentColor);
+  }
+}
+
+@keyframes warning-flash {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+/* 悬停效果 */
+.emotion-emoji:hover {
+  transform: scale(1.2) rotate(5deg);
+  transition: all 0.2s ease-in-out;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .emotion-emoji {
+    font-size: 1.5rem;
+  }
+  
+  .high-intensity {
+    animation-duration: 1.5s;
+  }
+  
+  .medium-intensity {
+    animation-duration: 2.5s;
+  }
+  
+  .low-intensity {
+    animation-duration: 3.5s;
+  }
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .emotion-emoji {
+    filter: brightness(1.1);
+  }
+}
+
+/* 减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .emotion-emoji {
+    animation: none;
+    transition: none;
+  }
+  
+  .high-intensity,
+  .medium-intensity,
+  .low-intensity {
+    animation: none;
+  }
+}

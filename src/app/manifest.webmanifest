@@ -1,0 +1,19 @@
+{
+  "name": "Jenrych AI - 智能AI聊天助手",
+  "short_name": "Jenrych AI",
+  "description": "强大的AI聊天助手，提供智能对话、多模态分析、语义搜索等功能。",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/apple-touch-icon.svg", "sizes": "180x180", "type": "image/svg+xml" },
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "utilities", "business"],
+  "lang": "zh-CN"
+}
+
