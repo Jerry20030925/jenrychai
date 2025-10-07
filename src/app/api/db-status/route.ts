@@ -3,22 +3,13 @@ import { PrismaClient } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
-    const prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: process.env.DATABASE_URL || 
-            process.env.POSTGRES_PRISMA_URL || 
-            process.env.SUPABASE_DATABASE_URL ||
-            "postgresql://postgres:k7p0azBccg7saihX@db.bsqsvmldrjyasgitprik.supabase.co:5432/postgres?sslmode=require",
-        },
-      },
-    });
+    const prisma = new PrismaClient();
 
     // 测试数据库连接
     await prisma.$connect();
     
     // 测试简单查询
-    const result = await prisma.$queryRaw`SELECT 1 as test, NOW() as current_time`;
+    const result = await prisma.$queryRaw`SELECT 1 as test, datetime('now') as current_time`;
     
     // 测试用户表
     const userCount = await prisma.user.count();
@@ -27,12 +18,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Supabase数据库连接正常',
+      message: 'SQLite数据库连接正常',
       data: {
-        testQuery: result,
+        testQuery: Array.isArray(result) ? result.map(r => ({
+          test: Number(r.test),
+          current_time: r.current_time
+        })) : result,
         userCount: userCount,
         timestamp: new Date().toISOString(),
-        databaseUrl: process.env.DATABASE_URL ? '使用环境变量' : '使用默认连接'
+        databaseType: 'SQLite'
       }
     });
 
@@ -41,7 +35,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       success: false,
-      message: 'Supabase数据库连接失败',
+      message: '数据库连接失败',
       error: error instanceof Error ? error.message : String(error),
       fallback: '将使用内存存储作为备用方案',
       timestamp: new Date().toISOString()

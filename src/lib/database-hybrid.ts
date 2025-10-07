@@ -61,27 +61,26 @@ let prisma: PrismaClient | null = null;
 let dbConnectionFailed = false;
 
 try {
-  // 使用 Supabase 数据库连接
-  const databaseUrl = process.env.DATABASE_URL || 
-    process.env.POSTGRES_PRISMA_URL || 
-    process.env.SUPABASE_DATABASE_URL ||
-    "postgresql://postgres:k7p0azBccg7saihX@db.bsqsvmldrjyasgitprik.supabase.co:5432/postgres?sslmode=require";
-  
+  // 仅使用 Prisma 的默认数据源（由 schema + 环境变量提供）
+  // 生产环境必须提供 DATABASE_URL，否则直接报错，避免使用非持久化存储
+  const isProd = process.env.NODE_ENV === 'production';
+  const databaseUrl = process.env.DATABASE_URL || process.env.DIRECT_URL || process.env.POSTGRES_PRISMA_URL || process.env.SUPABASE_DATABASE_URL;
+
+  if (isProd && !databaseUrl) {
+    throw new Error('生产环境缺少 DATABASE_URL，请在 Vercel 环境变量中设置');
+  }
+
   prisma = new PrismaClient({
-    datasources: {
-      db: {
-        url: databaseUrl,
-      },
-    },
+    // 若本地提供了自定义 URL，则按该 URL 连接（便于本地直连 Supabase）
+    datasources: databaseUrl ? { db: { url: databaseUrl } } : undefined as any,
     log: ['query', 'info', 'warn', 'error'],
   });
-  
-  // 测试数据库连接（同步，确保数据库可用）
+
   prisma.$connect().then(() => {
-    console.log('✅ Supabase 数据库连接成功');
+    console.log('✅ 数据库连接成功');
     dbConnectionFailed = false;
   }).catch((error: unknown) => {
-    console.log('❌ Supabase 数据库连接失败:', error instanceof Error ? error.message : String(error));
+    console.log('❌ 数据库连接失败，将使用内存存储:', error instanceof Error ? error.message : String(error));
     dbConnectionFailed = true;
   });
 } catch (error: unknown) {
