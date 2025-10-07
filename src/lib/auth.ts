@@ -13,30 +13,32 @@ const credentialsSchema = z.object({
 export const authOptions: NextAuthOptions = {
   session: { 
     strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 减少到1天，减少cookie大小
+    maxAge: 2 * 60 * 60, // 减少到2小时，大幅减少cookie大小
   },
-  debug: false, // 生产环境关闭debug，减少日志输出
+  debug: false,
   useSecureCookies: process.env.NODE_ENV === "production",
-  cookies: {
-    sessionToken: {
-      name: "next-auth.session-token", // 简化cookie名称
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 24 * 60 * 60, // 减少到1天
-      },
+  pages: {
+    signIn: '/login',
+    error: '/login',
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      // 只存储必要的用户信息，减少token大小
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+      }
+      return token;
     },
-    csrfToken: {
-      name: "next-auth.csrf-token", // 简化cookie名称
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 24 * 60 * 60, // 减少到1天
-      },
+    async session({ session, token }) {
+      // 只返回必要的会话信息
+      if (token) {
+        session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
+      }
+      return session;
     },
   },
   providers: [
