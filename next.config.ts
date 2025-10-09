@@ -17,13 +17,11 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   generateEtags: false,
-  // 代码分割优化
+  // 代码分割优化 - 移除可能导致构建问题的实验性功能
   experimental: {
-    optimizeCss: true,
     optimizePackageImports: ['framer-motion', 'react-markdown'],
   },
   // 构建优化
-  swcMinify: true,
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
