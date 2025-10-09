@@ -493,8 +493,6 @@ export default function HomePage() {
         }
       }));
       console.log('👍 点赞消息:', messageId);
-      setShowSuccessMessage('👍 已点赞');
-      setTimeout(() => setShowSuccessMessage(null), 2000);
     } else if (action === 'dislike') {
       setMessageActions(prev => ({
         ...prev,
@@ -505,8 +503,6 @@ export default function HomePage() {
         }
       }));
       console.log('👎 点踩消息:', messageId);
-      setShowSuccessMessage('👎 已点踩');
-      setTimeout(() => setShowSuccessMessage(null), 2000);
     } else if (action === 'copy') {
       // 复制消息内容
       const message = messages.find(m => m.id === messageId);
@@ -571,17 +567,21 @@ export default function HomePage() {
         // 重新生成回答 - 只有用户点击时才执行
         if (!loading) {
           console.log('🔄 重新生成消息:', messageId);
-          setShowSuccessMessage('🔄 正在重新生成...');
-          // 这里可以添加重新生成的逻辑
-          // 例如：重新发送最后一条用户消息
+          // 找到最后一条用户消息
           const lastUserMessage = messages.filter(m => m.role === 'user').pop();
           if (lastUserMessage) {
-            // 重新发送消息 - 创建一个模拟的form事件
-            const mockEvent = {
-              preventDefault: () => {},
-              currentTarget: { checkValidity: () => true }
-            } as unknown as React.FormEvent;
-            handleSubmit(mockEvent);
+            // 移除最后一条AI回复
+            setMessages(prev => prev.filter(m => m.role !== 'assistant' || m.id !== messageId));
+            // 重新发送最后一条用户消息
+            setInput(lastUserMessage.content);
+            // 触发重新生成
+            setTimeout(() => {
+              const mockEvent = {
+                preventDefault: () => {},
+                currentTarget: { checkValidity: () => true }
+              } as unknown as React.FormEvent;
+              handleSubmit(mockEvent);
+            }, 100);
           }
         }
     }
@@ -912,7 +912,7 @@ export default function HomePage() {
                   )}
 
                   {/* 合并功能按钮 - 与输入框连接 */}
-                  <div className="flex justify-center mb-4">
+                  <div className="flex justify-center mb-2">
             <motion.button
               onClick={() => {
                 if (deepThinking && webSearch) {
@@ -931,17 +931,9 @@ export default function HomePage() {
                   setDeepThinking(true);
                 }
               }}
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95, y: 0 }}
-              animate={(deepThinking || webSearch) ? {
-                scale: [1, 1.05, 1],
-                boxShadow: [
-                  "0 0 0 0 rgba(168, 85, 247, 0.4)",
-                  "0 0 0 15px rgba(168, 85, 247, 0.1)",
-                  "0 0 0 0 rgba(168, 85, 247, 0.4)"
-                ]
-              } : {}}
-              transition={{ duration: 0.4 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ duration: 0.2 }}
               className={`relative flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 ${
                 deepThinking
                   ? "bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-600/50"
@@ -950,61 +942,37 @@ export default function HomePage() {
                   : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-700 hover:border-purple-500 hover:text-purple-500"
               }`}
             >
-              {/* 氛围灯效果 */}
-              {(deepThinking || webSearch) && (
-                <motion.div
-                  className="absolute inset-0 rounded-xl opacity-30"
-                  animate={{
-                    background: deepThinking 
-                      ? "radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, transparent 70%)"
-                      : "radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)"
-                  }}
-                  transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
-                />
-              )}
-              
               {/* 图标 */}
-              <motion.div
-                className="relative z-10"
-                animate={(deepThinking || webSearch) ? {
-                  scale: [1, 1.2, 1],
-                  rotate: [0, 5, -5, 0]
-                } : {}}
-                transition={{ duration: 0.6, repeat: (deepThinking || webSearch) ? Infinity : 0 }}
-              >
+              <div className="relative z-10">
                 {deepThinking ? (
-                  <motion.svg
+                  <svg
                     width="20"
                     height="20"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
-                    animate={{ rotate: [0, 360] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                   >
                     <polyline points="7.5 19.79 7.5 14.6 3 12"/>
                     <polyline points="21 12 16.5 14.6 16.5 19.79"/>
                     <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
                     <line x1="12" y1="22.08" x2="12" y2="12"/>
-                  </motion.svg>
+                  </svg>
                 ) : webSearch ? (
-                  <motion.svg
+                  <svg
                     width="20"
                     height="20"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 1, repeat: Infinity }}
                   >
                     <circle cx="12" cy="12" r="10"/>
                     <line x1="2" y1="12" x2="22" y2="12"/>
                     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                  </motion.svg>
+                  </svg>
                 ) : (
-                  <motion.svg
+                  <svg
                     width="20"
                     height="20"
                     viewBox="0 0 24 24"
@@ -1013,9 +981,9 @@ export default function HomePage() {
                     strokeWidth="2"
                   >
                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                  </motion.svg>
+                  </svg>
                 )}
-              </motion.div>
+              </div>
               
               {/* 文字标签 */}
               <span className="relative z-10 font-medium">
@@ -1024,13 +992,8 @@ export default function HomePage() {
               
               {/* 状态指示器 */}
               {(deepThinking || webSearch) && (
-                <motion.div
+                <div
                   className="relative z-10 w-2 h-2 rounded-full"
-                  animate={{
-                    scale: [1, 1.5, 1],
-                    opacity: [0.5, 1, 0.5]
-                  }}
-                  transition={{ duration: 1, repeat: Infinity }}
                   style={{
                     backgroundColor: deepThinking ? "#a855f7" : "#3b82f6"
                   }}
@@ -1077,7 +1040,7 @@ export default function HomePage() {
 
                   {/* Input Form */}
                   <form onSubmit={handleSubmit} className="relative max-w-2xl mx-auto">
-                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-2 mt-2">
+                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-2">
               {/* 文件上传按钮 */}
               <motion.button
                 type="button"

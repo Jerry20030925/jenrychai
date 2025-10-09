@@ -392,7 +392,7 @@ export async function POST(request: Request): Promise<Response> {
         weekday: 'long',
         timeZone: 'Asia/Shanghai'
       });
-      const currentDateTime = `当前日期时间：${dateString} ${now.toLocaleTimeString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })}。重要提醒：今天是2025年10月9日，请确保所有回答中的日期信息都是准确的。`;
+      const currentDateTime = `当前日期时间：${dateString} ${now.toLocaleTimeString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })}。⚠️ 重要提醒：今天是2025年10月9日，不是10月5日！请确保所有回答中的日期信息都是准确的，特别是天气查询时。`;
 
       const systemPrompt =
         body?.systemPrompt ||
