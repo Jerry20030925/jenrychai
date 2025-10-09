@@ -37,6 +37,7 @@ export async function POST(request: Request): Promise<Response> {
     console.log("📧 For email:", email);
     console.log("⏰ Expires at:", expires);
     console.log("📊 Total tokens in storage:", resetTokens.size);
+    console.log("🔑 All tokens:", Array.from(resetTokens.keys()).slice(0, 5));
 
     // 生成重置链接
     const resetUrl = `${process.env.NEXTAUTH_URL || 'https://jenrychai.com'}/reset-password?token=${token}`;
@@ -69,19 +70,36 @@ export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const token = url.searchParams.get('token');
 
+    console.log("🔍 Validating token in GET:", token);
+    console.log("📊 Available tokens:", Array.from(resetTokens.keys()).slice(0, 5));
+    console.log("📊 Total tokens in storage:", resetTokens.size);
+
     if (!token) {
+      console.log("❌ No token provided");
       return new Response(JSON.stringify({ error: "缺少重置令牌" }), { status: 400 });
     }
 
     const resetData = resetTokens.get(token);
-    
-    if (!resetData || resetData.expires < new Date()) {
+
+    if (!resetData) {
+      console.log("❌ Token not found in storage");
       return new Response(JSON.stringify({ error: "重置令牌无效或已过期" }), { status: 400 });
     }
 
-    return new Response(JSON.stringify({ 
+    const now = new Date();
+    console.log("⏰ Token expires:", resetData.expires);
+    console.log("⏰ Current time:", now);
+    console.log("⏰ Is expired:", resetData.expires < now);
+
+    if (resetData.expires < now) {
+      console.log("❌ Token has expired");
+      return new Response(JSON.stringify({ error: "重置令牌无效或已过期" }), { status: 400 });
+    }
+
+    console.log("✅ Token is valid");
+    return new Response(JSON.stringify({
       valid: true,
-      email: resetData.email 
+      email: resetData.email
     }), { status: 200 });
 
   } catch (error: unknown) {
