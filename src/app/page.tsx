@@ -280,27 +280,6 @@ const MessageComponent = memo(({ message, messageActions, onMessageAction, loadi
               </motion.svg>
             </motion.button>
             
-            <motion.button
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              whileHover={{ scale: 1.1, y: -2 }}
-              whileTap={{ scale: 0.9, y: 0 }}
-              onClick={() => {
-                console.log('更多选项:', message.id);
-              }}
-            >
-              <motion.svg 
-                className="w-4 h-4" 
-                fill="currentColor" 
-                viewBox="0 0 20 20"
-                whileHover={{ 
-                  scale: 1.2,
-                  rotate: 5
-                }}
-                transition={{ duration: 0.2 }}
-              >
-                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-              </motion.svg>
-            </motion.button>
           </div>
         )}
       </div>
@@ -532,27 +511,61 @@ export default function HomePage() {
       // 复制消息内容
       const message = messages.find(m => m.id === messageId);
       if (message) {
-        navigator.clipboard.writeText(message.content);
-        console.log('📋 复制消息:', messageId);
-        setShowSuccessMessage('📋 已复制到剪贴板');
-        setTimeout(() => setShowSuccessMessage(null), 2000);
+        navigator.clipboard.writeText(message.content).then(() => {
+          setMessageActions(prev => ({
+            ...prev,
+            [messageId]: {
+              ...prev[messageId],
+              copied: true
+            }
+          }));
+          console.log('📋 复制消息:', messageId);
+          setShowSuccessMessage('📋 已复制到剪贴板');
+          setTimeout(() => {
+            setShowSuccessMessage(null);
+            setMessageActions(prev => ({
+              ...prev,
+              [messageId]: {
+                ...prev[messageId],
+                copied: false
+              }
+            }));
+          }, 2000);
+        }).catch(err => {
+          console.error('复制失败:', err);
+          setShowSuccessMessage('❌ 复制失败');
+          setTimeout(() => setShowSuccessMessage(null), 2000);
+        });
       }
     } else if (action === 'share') {
       // 分享消息
-      if (navigator.share) {
-        const message = messages.find(m => m.id === messageId);
-        if (message) {
+      const message = messages.find(m => m.id === messageId);
+      if (message) {
+        if (navigator.share) {
           navigator.share({
             title: 'AI回答',
             text: message.content,
             url: window.location.href
+          }).then(() => {
+            console.log('🔗 分享成功');
+            setShowSuccessMessage('🔗 分享成功');
+            setTimeout(() => setShowSuccessMessage(null), 2000);
+          }).catch(err => {
+            console.error('分享失败:', err);
+            setShowSuccessMessage('❌ 分享失败');
+            setTimeout(() => setShowSuccessMessage(null), 2000);
+          });
+        } else {
+          navigator.clipboard.writeText(window.location.href).then(() => {
+            console.log('🔗 分享链接已复制到剪贴板');
+            setShowSuccessMessage('🔗 分享链接已复制');
+            setTimeout(() => setShowSuccessMessage(null), 2000);
+          }).catch(err => {
+            console.error('复制分享链接失败:', err);
+            setShowSuccessMessage('❌ 复制失败');
+            setTimeout(() => setShowSuccessMessage(null), 2000);
           });
         }
-      } else {
-        navigator.clipboard.writeText(window.location.href);
-        console.log('🔗 分享链接已复制到剪贴板');
-        setShowSuccessMessage('🔗 分享链接已复制');
-        setTimeout(() => setShowSuccessMessage(null), 2000);
       }
     } else if (action === 'regenerate') {
         // 重新生成回答 - 只有用户点击时才执行
@@ -898,79 +911,131 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* Function Buttons */}
-                  <div className="flex justify-center gap-3 mb-6">
+                  {/* 合并功能按钮 - 与输入框连接 */}
+                  <div className="flex justify-center mb-4">
             <motion.button
-              onClick={() => setDeepThinking(!deepThinking)}
+              onClick={() => {
+                if (deepThinking && webSearch) {
+                  // 如果两个都激活，关闭深度思考
+                  setDeepThinking(false);
+                } else if (deepThinking) {
+                  // 如果只有深度思考激活，切换到联网搜索
+                  setDeepThinking(false);
+                  setWebSearch(true);
+                } else if (webSearch) {
+                  // 如果只有联网搜索激活，切换到深度思考
+                  setWebSearch(false);
+                  setDeepThinking(true);
+                } else {
+                  // 如果都没激活，激活深度思考
+                  setDeepThinking(true);
+                }
+              }}
               whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.95, y: 0 }}
-              animate={deepThinking ? {
+              animate={(deepThinking || webSearch) ? {
                 scale: [1, 1.05, 1],
                 boxShadow: [
                   "0 0 0 0 rgba(168, 85, 247, 0.4)",
-                  "0 0 0 10px rgba(168, 85, 247, 0)",
-                  "0 0 0 0 rgba(168, 85, 247, 0)"
+                  "0 0 0 15px rgba(168, 85, 247, 0.1)",
+                  "0 0 0 0 rgba(168, 85, 247, 0.4)"
                 ]
               } : {}}
-              transition={{ duration: 0.3 }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+              transition={{ duration: 0.4 }}
+              className={`relative flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 ${
                 deepThinking
-                  ? "bg-purple-700 text-white shadow-lg shadow-purple-700/50"
+                  ? "bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-600/50"
+                  : webSearch
+                  ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/50"
                   : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-700 hover:border-purple-500 hover:text-purple-500"
               }`}
             >
-              <motion.svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                animate={deepThinking ? { rotate: 360 } : {}}
-                transition={{ duration: 2, repeat: deepThinking ? Infinity : 0, ease: "linear" }}
+              {/* 氛围灯效果 */}
+              {(deepThinking || webSearch) && (
+                <motion.div
+                  className="absolute inset-0 rounded-xl opacity-30"
+                  animate={{
+                    background: deepThinking 
+                      ? "radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, transparent 70%)"
+                      : "radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)"
+                  }}
+                  transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                />
+              )}
+              
+              {/* 图标 */}
+              <motion.div
+                className="relative z-10"
+                animate={(deepThinking || webSearch) ? {
+                  scale: [1, 1.2, 1],
+                  rotate: [0, 5, -5, 0]
+                } : {}}
+                transition={{ duration: 0.6, repeat: (deepThinking || webSearch) ? Infinity : 0 }}
               >
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
-                <polyline points="7.5 19.79 7.5 14.6 3 12"/>
-                <polyline points="21 12 16.5 14.6 16.5 19.79"/>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                <line x1="12" y1="22.08" x2="12" y2="12"/>
-              </motion.svg>
-            </motion.button>
-
-            <motion.button
-              onClick={() => setWebSearch(!webSearch)}
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95, y: 0 }}
-              animate={webSearch ? {
-                scale: [1, 1.05, 1],
-                boxShadow: [
-                  "0 0 0 0 rgba(59, 130, 246, 0.4)",
-                  "0 0 0 10px rgba(59, 130, 246, 0)",
-                  "0 0 0 0 rgba(59, 130, 246, 0)"
-                ]
-              } : {}}
-              transition={{ duration: 0.3 }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                webSearch
-                  ? "bg-blue-700 text-white shadow-lg shadow-blue-700/50"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-700 hover:border-blue-500 hover:text-blue-500"
-              }`}
-            >
-              <motion.svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                animate={webSearch ? { scale: [1, 1.2, 1] } : {}}
-                transition={{ duration: 1, repeat: webSearch ? Infinity : 0 }}
-              >
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="2" y1="12" x2="22" y2="12"/>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              </motion.svg>
+                {deepThinking ? (
+                  <motion.svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  >
+                    <polyline points="7.5 19.79 7.5 14.6 3 12"/>
+                    <polyline points="21 12 16.5 14.6 16.5 19.79"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                  </motion.svg>
+                ) : webSearch ? (
+                  <motion.svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  </motion.svg>
+                ) : (
+                  <motion.svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </motion.svg>
+                )}
+              </motion.div>
+              
+              {/* 文字标签 */}
+              <span className="relative z-10 font-medium">
+                {deepThinking ? "深度思考" : webSearch ? "联网搜索" : "智能助手"}
+              </span>
+              
+              {/* 状态指示器 */}
+              {(deepThinking || webSearch) && (
+                <motion.div
+                  className="relative z-10 w-2 h-2 rounded-full"
+                  animate={{
+                    scale: [1, 1.5, 1],
+                    opacity: [0.5, 1, 0.5]
+                  }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                  style={{
+                    backgroundColor: deepThinking ? "#a855f7" : "#3b82f6"
+                  }}
+                />
+              )}
             </motion.button>
           </div>
 
@@ -1012,7 +1077,7 @@ export default function HomePage() {
 
                   {/* Input Form */}
                   <form onSubmit={handleSubmit} className="relative max-w-2xl mx-auto">
-                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-2">
+                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-2 mt-2">
               {/* 文件上传按钮 */}
               <motion.button
                 type="button"
