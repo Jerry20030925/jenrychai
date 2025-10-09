@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useLanguage } from '../contexts/LanguageContext';
 
 export default function AccountPage() {
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const router = useRouter();
   const { t } = useLanguage();
   const [isEditing, setIsEditing] = useState(false);
@@ -75,11 +75,10 @@ export default function AccountPage() {
         setIsEditing(false);
 
         // 如果API返回了sessionUpdate标记，强制刷新session
-        if (data.sessionUpdate) {
+        if (data.sessionUpdate && updateSession) {
           console.log('🔄 更新NextAuth会话...');
           // 使用NextAuth的update方法更新session
-          const { update } = await import('next-auth/react');
-          await update({
+          await updateSession({
             name: data.name
           });
 
