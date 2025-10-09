@@ -7,15 +7,13 @@ interface CacheItem<T> {
 
 class MemoryCache {
   private cache = new Map<string, CacheItem<any>>();
-  private maxSize = 1000; // 最大缓存项数
+  private maxSize = 2000; // 增加最大缓存项数
+  private accessCounts = new Map<string, number>(); // 访问计数
 
   set<T>(key: string, value: T, ttl: number = 5 * 60 * 1000): void {
-    // 如果缓存已满，删除最旧的项
+    // 如果缓存已满，删除最少访问的项
     if (this.cache.size >= this.maxSize) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey) {
-        this.cache.delete(oldestKey);
-      }
+      this.evictLeastUsed();
     }
 
     this.cache.set(key, {
@@ -23,6 +21,7 @@ class MemoryCache {
       timestamp: Date.now(),
       ttl
     });
+    this.accessCounts.set(key, 0);
   }
 
   get<T>(key: string): T | null {
@@ -32,8 +31,13 @@ class MemoryCache {
     // 检查是否过期
     if (Date.now() - item.timestamp > item.ttl) {
       this.cache.delete(key);
+      this.accessCounts.delete(key);
       return null;
     }
+
+    // 增加访问计数
+    const count = this.accessCounts.get(key) || 0;
+    this.accessCounts.set(key, count + 1);
 
     return item.value as T;
   }
@@ -69,7 +73,33 @@ class MemoryCache {
     for (const [key, item] of this.cache.entries()) {
       if (now - item.timestamp > item.ttl) {
         this.cache.delete(key);
+        this.accessCounts.delete(key);
       }
+    }
+  }
+
+  // 淘汰最少使用的项
+  private evictLeastUsed(): void {
+    let leastUsedKey = '';
+    let minCount = Infinity;
+    
+    for (const [key, count] of this.accessCounts.entries()) {
+      if (count < minCount) {
+        minCount = count;
+        leastUsedKey = key;
+      }
+    }
+    
+    if (leastUsedKey) {
+      this.cache.delete(leastUsedKey);
+      this.accessCounts.delete(leastUsedKey);
+    }
+  }
+
+  // 预热缓存
+  warmup<T>(key: string, value: T, ttl: number = 10 * 60 * 1000): void {
+    if (!this.has(key)) {
+      this.set(key, value, ttl);
     }
   }
 }

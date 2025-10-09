@@ -27,6 +27,10 @@ export async function searchWithTavily(query: string, maxResults: number = 5): P
       return [];
     }
 
+    // 添加超时控制
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
     const response = await fetch('https://api.tavily.com/search', {
       method: 'POST',
       headers: {
@@ -43,10 +47,13 @@ export async function searchWithTavily(query: string, maxResults: number = 5): P
         include_domains: [],
         exclude_domains: [],
       }),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      console.log(`Tavily API error: ${response.statusText}`);
+      console.log(`Tavily API error: ${response.status} ${response.statusText}`);
       return [];
     }
 
@@ -59,7 +66,11 @@ export async function searchWithTavily(query: string, maxResults: number = 5): P
       publishedDate: result.published_date,
     })) || [];
   } catch (error) {
-    console.log('Tavily search error:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log('Tavily search timeout');
+    } else {
+      console.log('Tavily search error:', error);
+    }
     return [];
   }
 }
@@ -75,12 +86,19 @@ export async function searchWithGoogle(query: string, maxResults: number = 5): P
       return [];
     }
 
+    // 添加超时控制
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
     const response = await fetch(
-      `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${encodeURIComponent(query)}&num=${maxResults}`
+      `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${encodeURIComponent(query)}&num=${maxResults}`,
+      { signal: controller.signal }
     );
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      console.log(`Google API error: ${response.statusText}`);
+      console.log(`Google API error: ${response.status} ${response.statusText}`);
       return [];
     }
 
@@ -93,22 +111,64 @@ export async function searchWithGoogle(query: string, maxResults: number = 5): P
       publishedDate: item.pagemap?.metatags?.[0]?.['article:published_time'],
     })) || [];
   } catch (error) {
-    console.log('Google search error:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log('Google search timeout');
+    } else {
+      console.log('Google search error:', error);
+    }
     return [];
   }
 }
 
 // 综合搜索（优先使用Tavily，失败时使用Google）
 export async function performSemanticSearch(query: string, maxResults: number = 5): Promise<SearchResult[]> {
+  console.log(`🔍 开始综合搜索: "${query}", 最大结果数: ${maxResults}`);
+  
   // 先尝试Tavily
   let results = await searchWithTavily(query, maxResults);
+  console.log(`📊 Tavily搜索结果: ${results.length} 个`);
   
   // 如果Tavily没有结果，尝试Google
   if (results.length === 0) {
+    console.log('🔄 Tavily无结果，尝试Google搜索...');
     results = await searchWithGoogle(query, maxResults);
+    console.log(`📊 Google搜索结果: ${results.length} 个`);
   }
   
-  return results;
+  // 验证和清理结果
+  const validResults = results.filter(result => 
+    result.title && 
+    result.url && 
+    result.snippet && 
+    result.title.trim().length > 0
+  );
+  
+  // 去重（基于URL）
+  const uniqueResults = validResults.reduce((acc, current) => {
+    const existingIndex = acc.findIndex(item => item.url === current.url);
+    if (existingIndex === -1) {
+      acc.push(current);
+    } else {
+      // 如果已存在，保留更完整的结果
+      if (current.snippet.length > acc[existingIndex].snippet.length) {
+        acc[existingIndex] = current;
+      }
+    }
+    return acc;
+  }, [] as SearchResult[]);
+  
+  // 按相关性排序（简单实现：标题和内容匹配度）
+  const sortedResults = uniqueResults.sort((a, b) => {
+    const queryLower = query.toLowerCase();
+    const aScore = (a.title.toLowerCase().includes(queryLower) ? 2 : 0) + 
+                   (a.snippet.toLowerCase().includes(queryLower) ? 1 : 0);
+    const bScore = (b.title.toLowerCase().includes(queryLower) ? 2 : 0) + 
+                   (b.snippet.toLowerCase().includes(queryLower) ? 1 : 0);
+    return bScore - aScore;
+  });
+  
+  console.log(`✅ 最终有效结果: ${sortedResults.length} 个（去重后）`);
+  return sortedResults.slice(0, maxResults);
 }
 
 // 网页内容提取

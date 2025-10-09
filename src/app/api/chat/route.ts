@@ -147,8 +147,8 @@ export async function POST(request: Request): Promise<Response> {
 
     // 如需联网，先检索网络并拼接为额外 system 提示
     async function buildWebContext(query: string | undefined): Promise<string | null> {
-      if (!web || !process.env.TAVILY_API_KEY || !query) {
-        console.log("Web search skipped:", { web, hasTavilyKey: !!process.env.TAVILY_API_KEY, hasQuery: !!query });
+      if (!web || !query) {
+        console.log("Web search skipped:", { web, hasQuery: !!query });
         return null;
       }
       
@@ -159,46 +159,101 @@ export async function POST(request: Request): Promise<Response> {
         console.log("Using cached web context for query:", query);
         return cached;
       }
+
+      // 预热相关查询的缓存
+      const relatedQueries = generateRelatedQueries(query);
+      relatedQueries.forEach(relatedQuery => {
+        const relatedCacheKey = CACHE_KEYS.WEB_CONTEXT(relatedQuery);
+        if (!cache.has(relatedCacheKey)) {
+          // 异步预热缓存，不阻塞当前请求
+          performSemanticSearch(relatedQuery, 2).then(results => {
+            if (results.length > 0) {
+              const lines = results.map((r: any, i: number) => 
+                `【${i + 1}】${r?.title ?? "无标题"}\n内容：${(r?.content ?? "").slice(0, 100)}...\n来源：${r?.url ?? ""}`
+              ).join("\n\n");
+              const webContext = `📡 联网搜索结果（最新信息）：\n\n${lines}\n\n✨ 请基于以上最新信息回答用户问题。`;
+              cache.set(relatedCacheKey, webContext, 5 * 60 * 1000);
+            }
+          }).catch(() => {}); // 忽略预热错误
+        }
+      });
       
       try {
         console.log("Starting web search for query:", query);
-        const tavilyResponse = await fetch("https://api.tavily.com/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: process.env.TAVILY_API_KEY,
-            query,
-            search_depth: "basic",
-            max_results: 6,
-            include_images: false,
-            include_answer: false,
-          }),
-        });
         
-        if (!tavilyResponse.ok) {
-          console.error("Tavily API error:", tavilyResponse.status, tavilyResponse.statusText);
-          return null;
+        // 优先使用Tavily，失败时使用Google作为备选
+        let results: any[] = [];
+        let searchSource = '';
+        
+        // 尝试Tavily搜索
+        if (process.env.TAVILY_API_KEY) {
+          try {
+            const tavilyResponse = await fetch("https://api.tavily.com/search", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                api_key: process.env.TAVILY_API_KEY,
+                query,
+                search_depth: "basic",
+                max_results: 6,
+                include_images: false,
+                include_answer: false,
+              }),
+            });
+            
+            if (tavilyResponse.ok) {
+              const tavily = await tavilyResponse.json();
+              console.log("Tavily response:", tavily);
+              results = Array.isArray(tavily?.results) ? tavily.results.slice(0, 5) : [];
+              searchSource = 'Tavily';
+            } else {
+              console.warn("Tavily API error:", tavilyResponse.status, tavilyResponse.statusText);
+            }
+          } catch (tavilyError) {
+            console.warn("Tavily search failed:", tavilyError);
+          }
         }
         
-        const tavily = await tavilyResponse.json();
-        console.log("Tavily response:", tavily);
+        // 如果Tavily失败或没有结果，尝试Google搜索
+        if (results.length === 0 && process.env.GOOGLE_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) {
+          try {
+            const googleResponse = await fetch(
+              `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_API_KEY}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(query)}&num=5`
+            );
+            
+            if (googleResponse.ok) {
+              const googleData = await googleResponse.json();
+              console.log("Google response:", googleData);
+              results = googleData.items?.map((item: any) => ({
+                title: item.title,
+                content: item.snippet,
+                url: item.link
+              })) || [];
+              searchSource = 'Google';
+            } else {
+              console.warn("Google API error:", googleResponse.status, googleResponse.statusText);
+            }
+          } catch (googleError) {
+            console.warn("Google search failed:", googleError);
+          }
+        }
         
-        const results = Array.isArray(tavily?.results) ? tavily.results.slice(0, 5) : [];
         if (!results.length) {
-          console.log("No search results found");
+          console.log("No search results found from any source");
           return null;
         }
+        
+        console.log(`Web search completed using ${searchSource}, found ${results.length} results`);
         
         const lines = results.map((r: any, i: number) => 
           `【${i + 1}】${r?.title ?? "无标题"}\n内容：${(r?.content ?? "").slice(0, 200)}...\n来源：${r?.url ?? ""}`
         ).join("\n\n");
         
-        const webContext = `📡 联网搜索结果（最新信息）：\n\n${lines}\n\n✨ 请基于以上最新信息回答用户问题，并在回答末尾列出参考来源：[1][2][3]等格式。`;
+        const webContext = `📡 联网搜索结果（最新信息，来源：${searchSource}）：\n\n${lines}\n\n✨ 请基于以上最新信息回答用户问题，并在回答末尾列出参考来源：[1][2][3]等格式。`;
         
         // 缓存结果（10分钟）
         cache.set(cacheKey, webContext, 10 * 60 * 1000);
         
-        console.log("Web search completed, found", results.length, "results");
         return webContext;
       } catch (error) {
         console.error("Web search failed:", error);
@@ -206,18 +261,51 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
+    // 生成相关查询用于缓存预热
+    function generateRelatedQueries(query: string): string[] {
+      const relatedQueries: string[] = [];
+      
+      // 基于关键词生成相关查询
+      const keywords = query.split(/\s+/).filter(word => word.length > 2);
+      if (keywords.length > 0) {
+        // 生成简化版本
+        relatedQueries.push(keywords.slice(0, 2).join(' '));
+        // 生成扩展版本
+        if (keywords.length > 2) {
+          relatedQueries.push(keywords.join(' '));
+        }
+      }
+      
+      // 添加常见相关查询
+      if (query.includes('天气')) {
+        relatedQueries.push('天气预报', '天气查询');
+      }
+      if (query.includes('新闻')) {
+        relatedQueries.push('最新新闻', '今日新闻');
+      }
+      if (query.includes('时间')) {
+        relatedQueries.push('当前时间', '世界时间');
+      }
+      
+      return relatedQueries.slice(0, 3); // 限制数量
+    }
+
     const lastUserMsg = messages[messages.length - 1]?.content;
 
-    // 并行执行网络搜索和记忆检索以减少延迟
-    const [webContext, relevantMemories, searchResults] = await Promise.all([
+    // 优化并行处理：减少等待时间，提高响应速度
+    const [webContextResult, relevantMemoriesResult, searchResultsResult] = await Promise.allSettled([
       buildWebContext(lastUserMsg),
       // 恢复记忆检索，但限制数量以提高速度，并添加缓存
       userId ? getCachedMemories(userId, lastUserMsg || "") : Promise.resolve([]),
       // 恢复语义搜索，但限制结果数量，并添加缓存
-      getCachedSearchResults(lastUserMsg || "")
+      web ? performSemanticSearch(lastUserMsg || "", 3) : Promise.resolve([]) // 减少搜索结果数量
     ]);
 
-    // 缓存记忆检索结果
+    const webContext = webContextResult.status === 'fulfilled' ? webContextResult.value : null;
+    const relevantMemories = relevantMemoriesResult.status === 'fulfilled' ? relevantMemoriesResult.value : [];
+    const searchResults = searchResultsResult.status === 'fulfilled' ? searchResultsResult.value : [];
+
+    // 优化记忆检索缓存策略
     async function getCachedMemories(userId: string, query: string): Promise<EmbeddingResult[]> {
       const cacheKey = CACHE_KEYS.USER_MEMORIES(userId, query);
       const cached = cache.get<EmbeddingResult[]>(cacheKey);
@@ -228,8 +316,8 @@ export async function POST(request: Request): Promise<Response> {
 
       try {
         const memories = await searchMemories(userId, query, 3);
-        // 缓存结果（5分钟）
-        cache.set(cacheKey, memories, 5 * 60 * 1000);
+        // 延长缓存时间到10分钟，提高命中率
+        cache.set(cacheKey, memories, 10 * 60 * 1000);
         return memories;
       } catch (error) {
         console.error("Memory search failed:", error);
@@ -237,23 +325,36 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
-    // 缓存语义搜索结果
-    async function getCachedSearchResults(query: string): Promise<SearchResult[]> {
-      const cacheKey = CACHE_KEYS.SEARCH_RESULTS(query);
-      const cached = cache.get<SearchResult[]>(cacheKey);
-      if (cached) {
-        console.log("Using cached search results for query:", query);
-        return cached;
-      }
+    // 保存搜索结果到数据库
+    async function saveSearchResultsToDatabase(messageId: string, results: SearchResult[]): Promise<void> {
+      if (!results || results.length === 0) return;
 
       try {
-        const results = await performSemanticSearch(query, 3);
-        // 缓存结果（10分钟）
-        cache.set(cacheKey, results, 10 * 60 * 1000);
-        return results;
+        // 为每个搜索结果提取favicon
+        const resultsWithFavicon = results.map((result, index) => {
+          const url = new URL(result.url);
+          const favicon = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
+
+          return {
+            messageId,
+            title: result.title,
+            url: result.url,
+            snippet: result.snippet,
+            source: result.source,
+            publishedDate: result.publishedDate || null,
+            favicon,
+            displayOrder: index
+          };
+        });
+
+        // 批量保存到数据库
+        await (prisma as any).webSearchResult.createMany({
+          data: resultsWithFavicon
+        });
+
+        console.log(`✅ Saved ${results.length} search results to database for message ${messageId}`);
       } catch (error) {
-        console.error("Semantic search failed:", error);
-        return [];
+        console.error("❌ Failed to save search results to database:", error);
       }
     }
 
@@ -261,9 +362,9 @@ export async function POST(request: Request): Promise<Response> {
       // 基础消息
       // 构建记忆上下文
       let memoryContext = "";
-      if (relevantMemories.length > 0) {
+      if (Array.isArray(relevantMemories) && relevantMemories.length > 0) {
         memoryContext = "\n\n相关记忆信息：\n" + 
-          relevantMemories.map((memory, index) => 
+          relevantMemories.map((memory: any, index: number) => 
             `${index + 1}. [${memory.category}] ${memory.content} (重要性: ${memory.importance}/10)`
           ).join("\n") + 
           "\n\n请根据这些记忆信息提供更个性化的回答。";
@@ -271,9 +372,9 @@ export async function POST(request: Request): Promise<Response> {
 
       // 构建搜索上下文
       let searchContext = "";
-      if (searchResults.length > 0) {
+      if (Array.isArray(searchResults) && searchResults.length > 0) {
         searchContext = "\n\n实时搜索结果：\n" + 
-          searchResults.map((result, index) => 
+          searchResults.map((result: any, index: number) => 
             `${index + 1}. ${result.title}\n   ${result.snippet}\n   来源: ${result.url}`
           ).join("\n\n") + 
           "\n\n请结合这些搜索结果提供准确和最新的信息，并在回答末尾提供参考链接。";
@@ -442,6 +543,15 @@ export async function POST(request: Request): Promise<Response> {
     // 流式输出
     if (stream) {
       const encoder = new TextEncoder();
+      
+      // 添加响应头优化
+      const headers = new Headers({
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no', // 禁用Nginx缓冲
+      });
+      
       const streamBody = new ReadableStream<Uint8Array>({
         async start(controller) {
           try {
@@ -449,12 +559,15 @@ export async function POST(request: Request): Promise<Response> {
             const streamCompletion = await openai.chat.completions.create({
               model,
               messages: oaMessages,
-              temperature,
-              presence_penalty: 0.1,
-              frequency_penalty: 0.15,
-              // 大幅提升token限制，确保回答完整性
-              max_tokens: 8192,
+              temperature: Math.min(temperature, 0.8), // 限制温度以提高响应速度
+              presence_penalty: 0.05, // 减少惩罚以提高速度
+              frequency_penalty: 0.1, // 减少惩罚以提高速度
+              // 优化token限制，平衡速度和质量
+              max_tokens: 4096,
               stream: true,
+              // 添加性能优化参数
+              top_p: 0.9, // 减少采样范围以提高速度
+              stop: null, // 不设置停止词以提高速度
             });
             console.log('✅ 开始流式生成，模型:', model);
             // 累积内容用于保存
@@ -478,18 +591,19 @@ export async function POST(request: Request): Promise<Response> {
                 tokenCount++;
                 buffer += token;
 
-                // 批量发送token以提高性能，每5个token或遇到标点符号时发送
-                const shouldFlush = tokenCount % 5 === 0 ||
-                  /[。！？\n]/.test(token) ||
-                  buffer.length > 30;
+                // 优化批量发送策略：更频繁的发送以提高响应速度
+                const shouldFlush = tokenCount % 2 === 0 ||  // 每2个token发送一次
+                  /[。！？\n，；：]/.test(token) ||  // 遇到标点符号立即发送
+                  buffer.length > 15 ||  // 缓冲区超过15字符发送
+                  tokenCount % 10 === 0;  // 每10个token强制发送
 
                 if (shouldFlush) {
                   controller.enqueue(encoder.encode(buffer));
                   buffer = "";
                 }
 
-                // 每100个token记录一次进度
-                if (tokenCount % 100 === 0) {
+                // 每50个token记录一次进度（减少日志频率）
+                if (tokenCount % 50 === 0) {
                   console.log(`📝 已生成 ${tokenCount} tokens, ${fullText.length} 字符`);
                 }
               }
@@ -503,14 +617,14 @@ export async function POST(request: Request): Promise<Response> {
 
             console.log(`✅ 流式传输完成 - 总计: ${tokenCount} tokens, ${fullText.length} 字符`);
             // 追加参考链接（若开启联网）
-            if (searchResults && searchResults.length > 0) {
+            if (Array.isArray(searchResults) && searchResults.length > 0) {
               try {
-                const references = searchResults.map((result, index) => ({
+                const references = searchResults.map((result: any, index: number) => ({
                   url: result.url,
                   title: result.title
                 }));
                 
-                const refText = references.map((_, i) => `[${i + 1}]`).join('');
+                const refText = references.map((_: any, i: number) => `[${i + 1}]`).join('');
                 const appendix = `\n\n参考来源：${refText}`;
                 fullText += appendix;
                 controller.enqueue(encoder.encode(appendix));
@@ -527,9 +641,14 @@ export async function POST(request: Request): Promise<Response> {
               try {
                 // 使用混合存储，自动处理数据库连接状态
                 const { createMessage } = await import("@/lib/database-hybrid");
-                await createMessage(conversationId, "user", messages[messages.length - 1]?.content || "");
-                await createMessage(conversationId, "assistant", fullText);
+                const userMsgId = await createMessage(conversationId, "user", messages[messages.length - 1]?.content || "");
+                const assistantMsgId = await createMessage(conversationId, "assistant", fullText);
                 console.log("✅ Messages saved for user:", userId);
+
+                // 保存搜索结果到数据库（如果有）
+                if (Array.isArray(searchResults) && searchResults.length > 0 && assistantMsgId) {
+                  await saveSearchResultsToDatabase(assistantMsgId, searchResults);
+                }
 
                 // 异步提取记忆，不阻塞响应
                 setImmediate(async () => {
@@ -554,12 +673,10 @@ export async function POST(request: Request): Promise<Response> {
           }
         },
       });
+      headers.set('X-Conversation-Id', conversationId || "");
+      
       return new Response(streamBody, {
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "Cache-Control": "no-cache",
-          "X-Conversation-Id": conversationId || "",
-        },
+        headers: headers,
       });
     }
 
@@ -599,9 +716,9 @@ export async function POST(request: Request): Promise<Response> {
       choice = completion.choices?.[0]?.message;
       usage = (completion as any)?.usage ?? null;
       // 若开启联网：从搜索结果中提取参考链接
-      if (searchResults && searchResults.length > 0 && typeof choice?.content === "string") {
+      if (Array.isArray(searchResults) && searchResults.length > 0 && typeof choice?.content === "string") {
         try {
-          const references = searchResults.map((result, index) => ({
+          const references = searchResults.map((result: any, index: number) => ({
             url: result.url,
             title: result.title
           }));
@@ -610,7 +727,7 @@ export async function POST(request: Request): Promise<Response> {
           choice.references = references;
           
           // 在内容末尾添加数字引用
-          const refText = references.map((_, i) => `[${i + 1}]`).join('');
+          const refText = references.map((_: any, i: number) => `[${i + 1}]`).join('');
           choice.content = `${choice.content}\n\n参考来源：${refText}`;
         } catch (error) {
           console.error("处理参考链接失败:", error);
@@ -621,9 +738,14 @@ export async function POST(request: Request): Promise<Response> {
         try {
           // 使用混合存储，自动处理数据库连接状态
           const { createMessage } = await import("@/lib/database-hybrid");
-          await createMessage(conversationId, "user", messages[messages.length - 1]?.content || "");
-          await createMessage(conversationId, "assistant", choice?.content || "");
+          const userMsgId = await createMessage(conversationId, "user", messages[messages.length - 1]?.content || "");
+          const assistantMsgId = await createMessage(conversationId, "assistant", choice?.content || "");
           console.log("✅ Messages saved for user (non-stream):", userId);
+
+          // 保存搜索结果到数据库（如果有）
+          if (Array.isArray(searchResults) && searchResults.length > 0 && assistantMsgId) {
+            await saveSearchResultsToDatabase(assistantMsgId, searchResults);
+          }
 
           // 异步提取记忆，不阻塞响应
           setImmediate(async () => {

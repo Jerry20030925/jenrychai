@@ -323,7 +323,7 @@ export default function HomePage() {
       let fullContent = "";
       let buffer = "";
       let lastUpdateTime = 0;
-      const UPDATE_INTERVAL = 50; // 50ms更新一次UI
+      const UPDATE_INTERVAL = 16; // 16ms更新一次UI (约60fps)
 
       if (reader) {
         try {
@@ -345,9 +345,11 @@ export default function HomePage() {
             fullContent += chunk;
             buffer += chunk;
 
-            // 批量更新UI以提高性能
+            // 优化UI更新策略：更频繁的更新以提高响应速度
             const now = Date.now();
-            if (now - lastUpdateTime > UPDATE_INTERVAL || buffer.length > 20) {
+            if (now - lastUpdateTime > UPDATE_INTERVAL || 
+                buffer.length > 10 ||  // 减少缓冲区大小
+                /[。！？\n]/.test(chunk)) {  // 遇到标点符号立即更新
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: fullContent } : m
               ));
@@ -355,8 +357,8 @@ export default function HomePage() {
               lastUpdateTime = now;
             }
 
-            // 每100个chunk记录一次
-            if (chunkCount % 100 === 0) {
+            // 每50个chunk记录一次（减少日志频率）
+            if (chunkCount % 50 === 0) {
               console.log(`📥 已接收 ${chunkCount} chunks, ${fullContent.length} 字符`);
             }
           }

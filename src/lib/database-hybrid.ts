@@ -376,10 +376,10 @@ export async function getConversationsByUserId(userId: string) {
 }
 
 // 消息操作
-export async function createMessage(conversationId: string, role: string, content: string) {
+export async function createMessage(conversationId: string, role: string, content: string): Promise<string> {
   const id = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const now = new Date();
-  
+
   const message = {
     id,
     conversationId,
@@ -387,9 +387,9 @@ export async function createMessage(conversationId: string, role: string, conten
     content,
     createdAt: now
   };
-  
+
   memoryMessages.set(id, message);
-  
+
   // 尝试同步到数据库（如果连接正常）
   if (prisma && !dbConnectionFailed) {
     try {
@@ -407,8 +407,8 @@ export async function createMessage(conversationId: string, role: string, conten
       dbConnectionFailed = true;
     }
   }
-  
-  return message;
+
+  return id; // 返回消息ID用于关联搜索结果
 }
 
 export async function getMessagesByConversationId(conversationId: string) {

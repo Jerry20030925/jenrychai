@@ -79,3 +79,19 @@ model PasswordResetToken {
   @@index([token])
   @@map("password_reset_tokens")
 }
+
+model WebSearchResult {
+  id             String   @id @default(cuid())
+  messageId      String   @map("message_id")
+  title          String
+  url            String
+  snippet        String   @db.Text
+  source         String   // tavily, google, bing
+  publishedDate  String?  @map("published_date")
+  favicon        String?  // 网站favicon URL
+  displayOrder   Int      @default(0) @map("display_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([messageId])
+  @@map("web_search_results")
+}
