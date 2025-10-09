@@ -157,14 +157,27 @@ const MessageComponent = memo(({ message, messageActions, onMessageAction, loadi
                   ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
                   : 'hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title="点赞"
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              whileTap={{ scale: 0.9, rotate: -5 }}
+              animate={messageActions[message.id]?.liked ? { 
+                scale: [1, 1.2, 1],
+                rotate: [0, 10, -10, 0]
+              } : {}}
+              transition={{ duration: 0.3 }}
               onClick={() => onMessageAction(message.id, 'like')}
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <motion.svg 
+                className="w-4 h-4" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+                animate={messageActions[message.id]?.liked ? {
+                  scale: [1, 1.3, 1],
+                  rotate: [0, 15, -15, 0]
+                } : {}}
+                transition={{ duration: 0.4, ease: "easeInOut" }}
+              >
                 <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.834a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-              </svg>
+              </motion.svg>
             </motion.button>
             
             <motion.button
@@ -173,14 +186,27 @@ const MessageComponent = memo(({ message, messageActions, onMessageAction, loadi
                   ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400' 
                   : 'hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title="点踩"
+              whileHover={{ scale: 1.1, rotate: -5 }}
+              whileTap={{ scale: 0.9, rotate: 5 }}
+              animate={messageActions[message.id]?.disliked ? { 
+                scale: [1, 1.2, 1],
+                rotate: [0, -10, 10, 0]
+              } : {}}
+              transition={{ duration: 0.3 }}
               onClick={() => onMessageAction(message.id, 'dislike')}
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <motion.svg 
+                className="w-4 h-4" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+                animate={messageActions[message.id]?.disliked ? {
+                  scale: [1, 1.3, 1],
+                  rotate: [0, -15, 15, 0]
+                } : {}}
+                transition={{ duration: 0.4, ease: "easeInOut" }}
+              >
                 <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.834a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-              </svg>
+              </motion.svg>
             </motion.button>
             
             <motion.button
@@ -189,54 +215,91 @@ const MessageComponent = memo(({ message, messageActions, onMessageAction, loadi
                   ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
                   : 'hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title="复制"
+              whileHover={{ scale: 1.1, y: -2 }}
+              whileTap={{ scale: 0.9, y: 0 }}
+              animate={messageActions[message.id]?.copied ? { 
+                scale: [1, 1.2, 1],
+                y: [0, -5, 0]
+              } : {}}
+              transition={{ duration: 0.3 }}
               onClick={() => onMessageAction(message.id, 'copy')}
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <motion.svg 
+                className="w-4 h-4" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+                animate={messageActions[message.id]?.copied ? {
+                  scale: [1, 1.3, 1],
+                  y: [0, -3, 0]
+                } : {}}
+                transition={{ duration: 0.4, ease: "easeInOut" }}
+              >
                 <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
                 <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-              </svg>
+              </motion.svg>
             </motion.button>
             
             <motion.button
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title="分享"
+              whileHover={{ scale: 1.1, rotate: 10 }}
+              whileTap={{ scale: 0.9, rotate: -10 }}
               onClick={() => onMessageAction(message.id, 'share')}
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <motion.svg 
+                className="w-4 h-4" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+                whileHover={{ rotate: 15 }}
+                transition={{ duration: 0.2 }}
+              >
                 <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3 3 0 000-2.18l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
-              </svg>
+              </motion.svg>
             </motion.button>
             
             <motion.button
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title="重新生成"
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              whileTap={{ scale: 0.9, rotate: -5 }}
               onClick={() => onMessageAction(message.id, 'regenerate')}
               disabled={loading}
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <motion.svg 
+                className="w-4 h-4" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+                animate={loading ? { 
+                  rotate: 360,
+                  scale: [1, 1.1, 1]
+                } : {}}
+                transition={{ 
+                  rotate: { duration: 1, repeat: loading ? Infinity : 0, ease: "linear" },
+                  scale: { duration: 0.5, repeat: loading ? Infinity : 0, ease: "easeInOut" }
+                }}
+              >
                 <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-              </svg>
+              </motion.svg>
             </motion.button>
             
             <motion.button
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title="更多选项"
+              whileHover={{ scale: 1.1, y: -2 }}
+              whileTap={{ scale: 0.9, y: 0 }}
               onClick={() => {
                 console.log('更多选项:', message.id);
               }}
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <motion.svg 
+                className="w-4 h-4" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+                whileHover={{ 
+                  scale: 1.2,
+                  rotate: 5
+                }}
+                transition={{ duration: 0.2 }}
+              >
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-              </svg>
+              </motion.svg>
             </motion.button>
           </div>
         )}
@@ -839,7 +902,17 @@ export default function HomePage() {
                   <div className="flex justify-center gap-3 mb-6">
             <motion.button
               onClick={() => setDeepThinking(!deepThinking)}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95, y: 0 }}
+              animate={deepThinking ? {
+                scale: [1, 1.05, 1],
+                boxShadow: [
+                  "0 0 0 0 rgba(168, 85, 247, 0.4)",
+                  "0 0 0 10px rgba(168, 85, 247, 0)",
+                  "0 0 0 0 rgba(168, 85, 247, 0)"
+                ]
+              } : {}}
+              transition={{ duration: 0.3 }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
                 deepThinking
                   ? "bg-purple-500 text-white shadow-lg shadow-purple-500/50"
@@ -877,7 +950,17 @@ export default function HomePage() {
 
             <motion.button
               onClick={() => setWebSearch(!webSearch)}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95, y: 0 }}
+              animate={webSearch ? {
+                scale: [1, 1.05, 1],
+                boxShadow: [
+                  "0 0 0 0 rgba(59, 130, 246, 0.4)",
+                  "0 0 0 10px rgba(59, 130, 246, 0)",
+                  "0 0 0 0 rgba(59, 130, 246, 0)"
+                ]
+              } : {}}
+              transition={{ duration: 0.3 }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
                 webSearch
                   ? "bg-blue-500 text-white shadow-lg shadow-blue-500/50"
