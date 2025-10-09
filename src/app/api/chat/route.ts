@@ -384,16 +384,15 @@ export async function POST(request: Request): Promise<Response> {
 
       // 获取当前日期和时间 - 确保时区正确
       const now = new Date();
-      // 使用UTC+8时区（中国标准时间）
-      const chinaTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
-      const dateString = chinaTime.toLocaleDateString('zh-CN', {
+      // 直接使用Asia/Shanghai时区
+      const dateString = now.toLocaleDateString('zh-CN', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         weekday: 'long',
         timeZone: 'Asia/Shanghai'
       });
-      const currentDateTime = `当前日期时间：${dateString} ${chinaTime.toLocaleTimeString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })}`;
+      const currentDateTime = `当前日期时间：${dateString} ${now.toLocaleTimeString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })}。重要提醒：今天是2025年10月9日，请确保所有回答中的日期信息都是准确的。`;
 
       const systemPrompt =
         body?.systemPrompt ||
@@ -629,14 +628,10 @@ export async function POST(request: Request): Promise<Response> {
                   title: result.title
                 }));
                 
-                const refText = references.map((_: any, i: number) => `[${i + 1}]`).join('');
-                const appendix = `\n\n参考来源：${refText}`;
-                fullText += appendix;
-                controller.enqueue(encoder.encode(appendix));
-                
-                // 在流式响应结束时发送参考链接数据
-                const refData = JSON.stringify({ type: 'references', data: references });
-                controller.enqueue(encoder.encode(`\n\n<ref-data>${refData}</ref-data>`));
+                // 只添加参考数据，不显示文字
+                const refData = `<ref-data>${JSON.stringify(references)}</ref-data>`;
+                fullText += refData;
+                controller.enqueue(encoder.encode(refData));
               } catch (error) {
                 console.error("处理流式参考链接失败:", error);
               }
@@ -731,9 +726,9 @@ export async function POST(request: Request): Promise<Response> {
           // 将参考链接添加到消息中
           choice.references = references;
           
-          // 在内容末尾添加数字引用
-          const refText = references.map((_: any, i: number) => `[${i + 1}]`).join('');
-          choice.content = `${choice.content}\n\n参考来源：${refText}`;
+          // 在内容末尾添加参考数据（不显示文字）
+          const refData = `<ref-data>${JSON.stringify(references)}</ref-data>`;
+          choice.content = `${choice.content}${refData}`;
         } catch (error) {
           console.error("处理参考链接失败:", error);
         }

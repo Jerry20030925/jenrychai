@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, memo } from "react";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -31,23 +31,219 @@ const parseReferences = (content: string): { cleanContent: string; references: A
 
   try {
     const refData = JSON.parse(refDataMatch[1]);
-    if (refData.type === 'references' && Array.isArray(refData.data)) {
-      const references = refData.data.map((item: any) => ({
-        url: item.url || '',
-        title: item.title || ''
-      })).filter((ref: any) => ref.url && ref.title);
-      
-      // 移除 <ref-data> 标签，保留其他内容
-      const cleanContent = content.replace(/<ref-data>[\s\S]*?<\/ref-data>/, '').trim();
-      
-      return { cleanContent, references };
+    let references = [];
+    
+    // 处理两种格式：直接数组格式和包装格式
+    if (Array.isArray(refData)) {
+      references = refData;
+    } else if (refData.type === 'references' && Array.isArray(refData.data)) {
+      references = refData.data;
     }
+    
+    const processedReferences = references.map((item: any) => ({
+      url: item.url || '',
+      title: item.title || ''
+    })).filter((ref: any) => ref.url && ref.title);
+    
+    // 移除 <ref-data> 标签，保留其他内容
+    const cleanContent = content.replace(/<ref-data>[\s\S]*?<\/ref-data>/, '').trim();
+    
+    return { cleanContent, references: processedReferences };
   } catch (error) {
     console.error('解析参考来源失败:', error);
   }
 
   return { cleanContent: content, references: [] };
 };
+
+// 优化的消息组件
+const MessageComponent = memo(({ message, messageActions, onMessageAction, loading }: {
+  message: UiMessage;
+  messageActions: { [key: string]: { liked: boolean; disliked: boolean; copied: boolean } };
+  onMessageAction: (messageId: string, action: 'like' | 'dislike' | 'copy' | 'share' | 'regenerate') => void;
+  loading: boolean;
+}) => {
+  const { cleanContent, references } = useMemo(() => parseReferences(message.content), [message.content]);
+  
+  return (
+    <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+      <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+        message.role === 'user' 
+          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
+          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-lg'
+      }`}>
+        <div className="prose prose-sm max-w-none dark:prose-invert">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeHighlight]}
+          >
+            {cleanContent}
+          </ReactMarkdown>
+        </div>
+        
+        {/* 参考来源图标 */}
+        {message.role === "assistant" && references.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <ReferenceSources 
+              sources={references}
+              className="justify-start"
+            />
+          </div>
+        )}
+        
+        {/* 附件显示 */}
+        {message.attachments?.images && message.attachments.images.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {message.attachments.images.map((img, index) => (
+              <motion.div
+                key={index}
+                className="relative cursor-pointer"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+                whileHover={{ scale: 1.05 }}
+                onClick={() => window.open(img, '_blank')}
+              >
+                <img
+                  src={img}
+                  alt={`上传图片 ${index + 1}`}
+                  className="max-w-xs max-h-48 object-contain rounded-lg border-2 border-gray-200 dark:border-gray-600"
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    console.error('Image load error:', e);
+                    const target = e.target as HTMLImageElement;
+                    if (target) {
+                      target.style.display = 'none';
+                    }
+                  }}
+                  onLoad={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.opacity = '1';
+                  }}
+                  style={{ opacity: 0, transition: 'opacity 0.3s ease' }}
+                />
+              </motion.div>
+            ))}
+          </div>
+        )}
+        
+        {/* 文件附件显示 */}
+        {message.attachments?.files && message.attachments.files.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {message.attachments.files.map((file, index) => (
+              <motion.div
+                key={index}
+                className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs flex items-center gap-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                </svg>
+                <span className="truncate max-w-32">{file.name}</span>
+              </motion.div>
+            ))}
+          </div>
+        )}
+        
+        {/* 消息操作按钮 */}
+        {message.role === 'assistant' && (
+          <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <motion.button
+              className={`p-2 rounded-lg transition-colors ${
+                messageActions[message.id]?.liked 
+                  ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400' 
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="点赞"
+              onClick={() => onMessageAction(message.id, 'like')}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.834a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+              </svg>
+            </motion.button>
+            
+            <motion.button
+              className={`p-2 rounded-lg transition-colors ${
+                messageActions[message.id]?.disliked 
+                  ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400' 
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="点踩"
+              onClick={() => onMessageAction(message.id, 'dislike')}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.834a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+              </svg>
+            </motion.button>
+            
+            <motion.button
+              className={`p-2 rounded-lg transition-colors ${
+                messageActions[message.id]?.copied 
+                  ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' 
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="复制"
+              onClick={() => onMessageAction(message.id, 'copy')}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+              </svg>
+            </motion.button>
+            
+            <motion.button
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="分享"
+              onClick={() => onMessageAction(message.id, 'share')}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3 3 0 000-2.18l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+              </svg>
+            </motion.button>
+            
+            <motion.button
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="重新生成"
+              onClick={() => onMessageAction(message.id, 'regenerate')}
+              disabled={loading}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+              </svg>
+            </motion.button>
+            
+            <motion.button
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="更多选项"
+              onClick={() => {
+                console.log('更多选项:', message.id);
+              }}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+              </svg>
+            </motion.button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
 
 export default function HomePage() {
   const { data: session } = useSession();
@@ -75,11 +271,20 @@ export default function HomePage() {
   const [currentConversationId, setCurrentConversationId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  
+  // 请求去重和缓存
+  const requestCache = useRef<Map<string, Promise<any>>>(new Map());
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // 监听历史记录显示事件
   useEffect(() => {
     const handleToggleHistory = () => setShowHistory(prev => !prev);
-    const handleNewConversationEvent = () => handleNewConversation();
+    const handleNewConversationEvent = () => {
+      setMessages([]);
+      setCurrentConversationId(undefined);
+      setShowHistory(false);
+      console.log('🆕 新建对话');
+    };
     const handleShowSettings = () => setShowSettings(true);
 
     window.addEventListener('app:toggle-history', handleToggleHistory);
@@ -93,6 +298,19 @@ export default function HomePage() {
     };
   }, []);
 
+  // 清理内存和取消请求
+  useEffect(() => {
+    return () => {
+      // 清理请求缓存
+      requestCache.current.clear();
+      
+      // 取消正在进行的请求
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   // 从数据库获取最新的用户信息
   const [currentUserName, setCurrentUserName] = useState<string>("");
 
@@ -100,7 +318,12 @@ export default function HomePage() {
     // 如果已登录，从API获取最新的用户信息
     if (session?.user?.email) {
       fetch('/api/account')
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+          return res.json();
+        })
         .then(data => {
           if (data.name) {
             setCurrentUserName(data.name);
@@ -114,10 +337,10 @@ export default function HomePage() {
     } else {
       setCurrentUserName("");
     }
-  }, [session?.user?.email, session?.user?.name]);
+  }, [session?.user?.email]); // 移除 session?.user?.name 依赖，避免不必要的重新获取
 
-  // 根据时间生成问候语
-  const getTimeBasedGreeting = () => {
+  // 根据时间生成问候语 - 使用useMemo优化
+  const greeting = useMemo(() => {
     const hour = new Date().getHours();
     const userName = currentUserName || session?.user?.name || "";
 
@@ -135,9 +358,7 @@ export default function HomePage() {
     }
 
     return userName ? `${timeGreeting}，${userName}！` : `${timeGreeting}！`;
-  };
-
-  const greeting = getTimeBasedGreeting();
+  }, [currentUserName, session?.user?.name]);
 
   // 处理文件上传
   const handleFileUpload = async (file: File, type: 'image' | 'file') => {
@@ -193,15 +414,15 @@ export default function HomePage() {
   };
 
   // 处理新建对话
-  const handleNewConversation = () => {
+  const handleNewConversation = useCallback(() => {
     setMessages([]);
     setCurrentConversationId(undefined);
     setShowHistory(false);
     console.log('🆕 新建对话');
-  };
+  }, []);
 
   // 处理选择对话
-  const handleSelectConversation = async (conversationId: string) => {
+  const handleSelectConversation = useCallback(async (conversationId: string) => {
     try {
       const response = await fetch(`/api/conversations/${conversationId}`);
       if (response.ok) {
@@ -210,14 +431,16 @@ export default function HomePage() {
         setCurrentConversationId(conversationId);
         setShowHistory(false);
         console.log('📖 加载对话:', conversationId);
+      } else {
+        throw new Error(`Failed to load conversation: ${response.status}`);
       }
     } catch (error) {
       console.error('加载对话失败:', error);
     }
-  };
+  }, []);
 
   // 处理消息操作
-  const handleMessageAction = (messageId: string, action: 'like' | 'dislike' | 'copy' | 'share' | 'regenerate') => {
+  const handleMessageAction = useCallback((messageId: string, action: 'like' | 'dislike' | 'copy' | 'share' | 'regenerate') => {
     if (action === 'like') {
       setMessageActions(prev => ({
         ...prev,
@@ -286,12 +509,20 @@ export default function HomePage() {
           }
         }
     }
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     // 允许没有文本但有附件的情况
     if ((!input.trim() && attachments.images.length === 0 && attachments.files.length === 0) || loading) return;
+    
+    // 取消之前的请求
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // 创建新的AbortController
+    abortControllerRef.current = new AbortController();
 
     const userMessage: UiMessage = {
       id: Date.now().toString(),
@@ -329,12 +560,13 @@ export default function HomePage() {
           model: deepThinking ? "deepseek-reasoner" : "deepseek-chat",
           attachments: userMessage.attachments,
           conversationId: currentConversationId // 发送当前对话ID
-        })
+        }),
+        signal: abortControllerRef.current.signal
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "请求失败");
+        throw new Error(errorData.error || `请求失败: ${response.status} ${response.statusText}`);
       }
 
       // 从响应头获取conversationId
@@ -439,13 +671,20 @@ export default function HomePage() {
               m.id === assistantId ? { ...m, content: fallbackData.reply?.content || "抱歉，没有收到回复" } : m
             ));
           } else {
-            throw new Error("流式和非流式响应都失败了");
+            const errorData = await fallbackResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || "流式和非流式响应都失败了");
           }
         }
       } else {
         throw new Error("无法读取响应流");
       }
             } catch (error) {
+              // 如果是请求被取消，不显示错误
+              if (error instanceof Error && error.name === 'AbortError') {
+                console.log('请求被取消');
+                return;
+              }
+              
               console.error("Error:", error);
               const errorMsg = error instanceof Error ? error.message : "未知错误";
               setErrorMessage(`请求失败：${errorMsg}`);
@@ -461,7 +700,7 @@ export default function HomePage() {
       setShowDeepThinkingFeedback(false);
       setShowWebSearchFeedback(false);
     }
-  };
+  }, [input, attachments, loading, deepThinking, webSearch, messages, currentConversationId]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
@@ -472,226 +711,16 @@ export default function HomePage() {
             {messages.map((message) => (
               <motion.div
                 key={message.id}
-                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className={`max-w-3xl p-4 rounded-lg ${
-                  message.role === "user" 
-                    ? "bg-blue-500 text-white" 
-                    : "bg-white dark:bg-gray-800 border dark:border-gray-700"
-                }`}>
-                  {/* 显示附件 */}
-                  {message.attachments && (
-                    <div className="mb-3">
-                      {message.attachments.images && message.attachments.images.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {message.attachments.images.map((img, index) => (
-                            <motion.div
-                              key={index}
-                              className="relative cursor-pointer"
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ duration: 0.3, delay: index * 0.1 }}
-                              whileHover={{ scale: 1.05 }}
-                              onClick={() => window.open(img, '_blank')}
-                            >
-                              <img
-                                src={img}
-                                alt={`上传图片 ${index + 1}`}
-                                className="max-w-xs max-h-48 object-contain rounded-lg border-2 border-gray-200 dark:border-gray-600"
-                                onError={(e) => {
-                                  console.error('Image load error:', e);
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                              />
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
-                      {message.attachments.files && message.attachments.files.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {message.attachments.files.map((file, index) => (
-                            <motion.div
-                              key={index}
-                              className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs flex items-center gap-2"
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.3, delay: index * 0.1 }}
-                            >
-                              <span>📄</span>
-                              <span className="truncate max-w-32">{file.name}</span>
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <ReactMarkdown 
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
-                    >
-                      {parseReferences(message.content).cleanContent}
-                    </ReactMarkdown>
-                  </div>
-                  
-                  {/* 参考来源图标 */}
-                  {message.role === "assistant" && parseReferences(message.content).references.length > 0 && (
-                    <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      <ReferenceSources 
-                        sources={parseReferences(message.content).references}
-                        className="justify-start"
-                      />
-                    </div>
-                  )}
-                  
-                  {/* AI回答后的功能图标 */}
-                  {message.role === "assistant" && (
-                    <div className="flex items-center gap-1 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      {/* 点赞按钮 */}
-                      <motion.button
-                        whileHover={{ scale: 1.15 }}
-                        whileTap={{ scale: 0.9 }}
-                        className={`p-2 rounded-full transition-all duration-200 ${
-                          messageActions[message.id]?.liked 
-                            ? 'text-green-500 bg-green-50 dark:bg-green-900/20' 
-                            : 'text-gray-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
-                        }`}
-                        title="点赞"
-                        onClick={() => handleMessageAction(message.id, 'like')}
-                      >
-                        <motion.svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 24 24" 
-                          fill={messageActions[message.id]?.liked ? "currentColor" : "none"} 
-                          stroke="currentColor" 
-                          strokeWidth="2"
-                          animate={messageActions[message.id]?.liked ? { scale: [1, 1.2, 1] } : {}}
-                          transition={{ duration: 0.3 }}
-                        >
-                          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
-                        </motion.svg>
-                      </motion.button>
-                      
-                      {/* 点踩按钮 */}
-                      <motion.button
-                        whileHover={{ scale: 1.15 }}
-                        whileTap={{ scale: 0.9 }}
-                        className={`p-2 rounded-full transition-all duration-200 ${
-                          messageActions[message.id]?.disliked 
-                            ? 'text-red-500 bg-red-50 dark:bg-red-900/20' 
-                            : 'text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
-                        }`}
-                        title="点踩"
-                        onClick={() => handleMessageAction(message.id, 'dislike')}
-                      >
-                        <motion.svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 24 24" 
-                          fill={messageActions[message.id]?.disliked ? "currentColor" : "none"} 
-                          stroke="currentColor" 
-                          strokeWidth="2"
-                          animate={messageActions[message.id]?.disliked ? { scale: [1, 1.2, 1] } : {}}
-                          transition={{ duration: 0.3 }}
-                        >
-                          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
-                        </motion.svg>
-                      </motion.button>
-                      
-                      {/* 复制按钮 */}
-                      <motion.button
-                        whileHover={{ scale: 1.15 }}
-                        whileTap={{ scale: 0.9 }}
-                        className={`p-2 rounded-full transition-all duration-200 ${
-                          messageActions[message.id]?.copied 
-                            ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                            : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                        }`}
-                        title="复制"
-                        onClick={() => handleMessageAction(message.id, 'copy')}
-                      >
-                        <motion.svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          strokeWidth="2"
-                          animate={messageActions[message.id]?.copied ? { scale: [1, 1.2, 1] } : {}}
-                          transition={{ duration: 0.3 }}
-                        >
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                        </motion.svg>
-                      </motion.button>
-                      
-                      {/* 分享按钮 */}
-                      <motion.button
-                        whileHover={{ scale: 1.15 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="p-2 rounded-full text-gray-500 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-200"
-                        title="分享"
-                        onClick={() => handleMessageAction(message.id, 'share')}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="18" cy="5" r="3"/>
-                          <circle cx="6" cy="12" r="3"/>
-                          <circle cx="18" cy="19" r="3"/>
-                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                        </svg>
-                      </motion.button>
-                      
-                      {/* 重新生成按钮 */}
-                      <motion.button
-                        whileHover={{ scale: 1.15 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="p-2 rounded-full text-gray-500 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all duration-200"
-                        title="重新生成"
-                        onClick={() => handleMessageAction(message.id, 'regenerate')}
-                        disabled={loading}
-                      >
-                        <motion.svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          strokeWidth="2"
-                          animate={loading ? { rotate: [0, 360] } : {}}
-                          transition={{ duration: 1, repeat: loading ? Infinity : 0, ease: "linear" }}
-                        >
-                          <polyline points="23 4 23 10 17 10"/>
-                          <polyline points="1 20 1 14 7 14"/>
-                          <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
-                        </motion.svg>
-                      </motion.button>
-                      
-                      {/* 更多选项按钮 */}
-                      <motion.button
-                        whileHover={{ scale: 1.15 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
-                        title="更多选项"
-                        onClick={() => {
-                          console.log('更多选项:', message.id);
-                          // 可以添加下拉菜单或其他功能
-                        }}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="1"/>
-                          <circle cx="19" cy="12" r="1"/>
-                          <circle cx="5" cy="12" r="1"/>
-                        </svg>
-                      </motion.button>
-                    </div>
-                  )}
-                </div>
+                <MessageComponent
+                  message={message}
+                  messageActions={messageActions}
+                  onMessageAction={handleMessageAction}
+                  loading={loading}
+                />
               </motion.div>
             ))}
           </div>

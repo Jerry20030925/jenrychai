@@ -41,16 +41,14 @@ export default function ReferenceSources({ sources, className = '' }: ReferenceS
       <div className={`flex flex-wrap gap-2 items-center ${className}`}>
         <span className="text-sm text-gray-600 mr-2">参考来源:</span>
         {sources.map((source, index) => (
-          <div key={index} className="flex items-center">
-            <FaviconIcon
-              url={source.url}
-              title={source.title}
-              size="sm"
-              onClick={() => handleSourceClick(source)}
-              className="hover:scale-110 transition-transform"
-            />
-            <span className="text-xs text-gray-500 ml-1">[{index + 1}]</span>
-          </div>
+          <FaviconIcon
+            key={index}
+            url={source.url}
+            title={source.title}
+            size="sm"
+            onClick={() => handleSourceClick(source)}
+            className="hover:scale-110 transition-transform"
+          />
         ))}
       </div>
 

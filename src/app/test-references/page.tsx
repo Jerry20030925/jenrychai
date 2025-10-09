@@ -105,20 +105,16 @@ export default function TestReferencesPage() {
             </div>
 
             <div>
-              <h3 className="text-lg font-medium mb-2">测试网站</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <h3 className="text-lg font-medium mb-2">测试网站（仅图标）</h3>
+              <div className="flex items-center space-x-4">
                 {references.map((ref, index) => (
-                  <div key={index} className="flex flex-col items-center space-y-2 p-3 border border-gray-200 rounded-lg">
-                    <FaviconIcon 
-                      url={ref.url} 
-                      title={ref.title} 
-                      size="md"
-                      onClick={() => window.open(ref.url, '_blank')}
-                    />
-                    <span className="text-xs text-center text-gray-600 truncate w-full">
-                      {ref.title}
-                    </span>
-                  </div>
+                  <FaviconIcon 
+                    key={index}
+                    url={ref.url} 
+                    title={ref.title} 
+                    size="md"
+                    onClick={() => window.open(ref.url, '_blank')}
+                  />
                 ))}
               </div>
             </div>

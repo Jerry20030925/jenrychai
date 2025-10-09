@@ -6,15 +6,27 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ['@prisma/client'],
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', 'www.google.com'],
+    formats: ['image/webp', 'image/avif'],
+    minimumCacheTTL: 60,
   },
   env: {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000',
   },
-  // 优化请求头大小
+  // 性能优化
   compress: true,
   poweredByHeader: false,
   generateEtags: false,
+  // 代码分割优化
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: ['framer-motion', 'react-markdown'],
+  },
+  // 构建优化
+  swcMinify: true,
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
   // 减少响应头大小 - 已移动到 serverExternalPackages
   // 添加正确的重定向规则
   async redirects() {
