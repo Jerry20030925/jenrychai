@@ -915,7 +915,7 @@ export default function HomePage() {
               transition={{ duration: 0.3 }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
                 deepThinking
-                  ? "bg-purple-500 text-white shadow-lg shadow-purple-500/50"
+                  ? "bg-purple-700 text-white shadow-lg shadow-purple-700/50"
                   : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-700 hover:border-purple-500 hover:text-purple-500"
               }`}
             >
@@ -936,16 +936,6 @@ export default function HomePage() {
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
                 <line x1="12" y1="22.08" x2="12" y2="12"/>
               </motion.svg>
-              深度思考
-              {deepThinking && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-xs"
-                >
-                  ✓
-                </motion.span>
-              )}
             </motion.button>
 
             <motion.button
@@ -963,7 +953,7 @@ export default function HomePage() {
               transition={{ duration: 0.3 }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
                 webSearch
-                  ? "bg-blue-500 text-white shadow-lg shadow-blue-500/50"
+                  ? "bg-blue-700 text-white shadow-lg shadow-blue-700/50"
                   : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-700 hover:border-blue-500 hover:text-blue-500"
               }`}
             >
@@ -981,16 +971,6 @@ export default function HomePage() {
                 <line x1="2" y1="12" x2="22" y2="12"/>
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
               </motion.svg>
-              联网搜索
-              {webSearch && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-xs"
-                >
-                  ✓
-                </motion.span>
-              )}
             </motion.button>
           </div>
 
