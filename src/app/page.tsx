@@ -310,6 +310,7 @@ export default function HomePage() {
   const [showSuccessMessage, setShowSuccessMessage] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const submitFormRef = useRef<HTMLFormElement>(null);
   const [currentConversationId, setCurrentConversationId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -576,16 +577,17 @@ export default function HomePage() {
             setInput(lastUserMessage.content);
             // 触发重新生成
             setTimeout(() => {
-              const mockEvent = {
-                preventDefault: () => {},
-                currentTarget: { checkValidity: () => true }
-              } as unknown as React.FormEvent;
-              handleSubmit(mockEvent);
+              if (!loading && lastUserMessage.content.trim()) {
+                // 使用form的submit方法触发提交
+                if (submitFormRef.current) {
+                  submitFormRef.current.requestSubmit();
+                }
+              }
             }, 100);
           }
         }
     }
-  }, []);
+  }, [messages, loading]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -912,7 +914,7 @@ export default function HomePage() {
                   )}
 
                   {/* 合并功能按钮 - 与输入框连接 */}
-                  <div className="flex justify-center mb-2">
+                  <div className="flex justify-center mb-0">
             <motion.button
               onClick={() => {
                 if (deepThinking && webSearch) {
@@ -934,12 +936,10 @@ export default function HomePage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               transition={{ duration: 0.2 }}
-              className={`relative flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 ${
-                deepThinking
-                  ? "bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-600/50"
-                  : webSearch
-                  ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/50"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-700 hover:border-purple-500 hover:text-purple-500"
+              className={`relative flex items-center gap-3 px-6 py-3 rounded-t-xl transition-all duration-300 ${
+                deepThinking || webSearch
+                  ? "bg-gradient-to-r from-orange-400 via-yellow-400 via-green-400 via-blue-400 to-purple-400 text-white shadow-lg"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-700 hover:border-orange-400 hover:text-orange-500"
               }`}
             >
               {/* 图标 */}
@@ -987,16 +987,13 @@ export default function HomePage() {
               
               {/* 文字标签 */}
               <span className="relative z-10 font-medium">
-                {deepThinking ? "深度思考" : webSearch ? "联网搜索" : "智能助手"}
+                {deepThinking || webSearch ? "联网模式" : "智能助手"}
               </span>
               
               {/* 状态指示器 */}
               {(deepThinking || webSearch) && (
                 <div
-                  className="relative z-10 w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor: deepThinking ? "#a855f7" : "#3b82f6"
-                  }}
+                  className="relative z-10 w-2 h-2 rounded-full bg-white opacity-80"
                 />
               )}
             </motion.button>
@@ -1039,8 +1036,8 @@ export default function HomePage() {
           )}
 
                   {/* Input Form */}
-                  <form onSubmit={handleSubmit} className="relative max-w-2xl mx-auto">
-                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-2">
+                  <form ref={submitFormRef} onSubmit={handleSubmit} className="relative max-w-2xl mx-auto">
+                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-b-xl shadow-lg border border-gray-200 dark:border-gray-700 border-t-0 p-2">
               {/* 文件上传按钮 */}
               <motion.button
                 type="button"
