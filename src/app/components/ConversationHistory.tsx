@@ -32,7 +32,11 @@ export default function ConversationHistory({
 
   // 获取对话历史 - 直接从数据库获取，不显示加载动画
   const fetchConversations = async () => {
-    if (!session?.user?.email) return;
+    if (!session?.user?.email) {
+      console.log('⚠️ 用户未登录，跳过加载对话记录');
+      setConversations([]);
+      return;
+    }
 
     try {
       const response = await fetch('/api/conversations', {
@@ -44,24 +48,42 @@ export default function ConversationHistory({
         setConversations(data.conversations || []);
         console.log('✅ 已加载对话记录:', data.conversations?.length || 0, '条');
       } else {
-        console.error('❌ 获取对话历史失败:', response.status);
+        console.error('❌ 获取对话历史失败:', response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ 错误详情:', errorData);
+        setConversations([]);
       }
     } catch (error) {
       console.error('❌ 获取对话历史失败:', error);
+      setConversations([]);
     }
   };
 
   // 预加载：组件挂载时就获取一次
   useEffect(() => {
+    console.log('🔍 ConversationHistory mounted, session:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      hasEmail: !!session?.user?.email,
+      email: session?.user?.email
+    });
     if (session?.user?.email) {
+      console.log('📥 开始预加载对话记录...');
       fetchConversations();
+    } else {
+      console.log('⚠️ 无法预加载对话记录 - 用户未登录');
     }
   }, [session?.user?.email]);
 
   // 打开时刷新
   useEffect(() => {
-    if (isOpen && session?.user?.email) {
-      fetchConversations();
+    if (isOpen) {
+      console.log('📖 对话历史面板打开，刷新对话记录...');
+      if (session?.user?.email) {
+        fetchConversations();
+      } else {
+        console.log('⚠️ 无法刷新对话记录 - 用户未登录');
+      }
     }
   }, [isOpen]);
 

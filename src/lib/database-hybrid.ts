@@ -156,25 +156,26 @@ export async function createUser(email: string, passwordHash: string, name: stri
 }
 
 export async function findUserByEmail(email: string) {
-  // 首先尝试从 Supabase REST API 查找
-  try {
-    const supabaseUser = await userOperations.findByEmail(email);
-    if (supabaseUser) {
-      console.log('✅ 从 Supabase 找到用户:', email);
-      return supabaseUser;
+  console.log('🔍 开始查找用户:', email);
+
+  // 首先检查内存存储
+  for (const user of memoryUsers.values()) {
+    if (user.email === email) {
+      console.log('✅ 从内存找到用户:', email);
+      return user;
     }
-  } catch (error) {
-    console.log('❌ Supabase 查询失败，尝试数据库:', error instanceof Error ? error.message : String(error));
   }
-  
-  // 回退到 Prisma 数据库
+  console.log('⚠️ 内存中未找到用户，继续查找数据库...');
+
+  // 尝试从 Prisma 数据库查找
   if (prisma && !dbConnectionFailed) {
     try {
+      console.log('📊 尝试从 Prisma 数据库查找...');
       const dbUser = await prisma.user.findUnique({ where: { email } });
       if (dbUser) {
-        console.log('✅ 从数据库找到用户:', email);
+        console.log('✅ 从 Prisma 数据库找到用户:', email);
         // 同步到内存作为缓存
-        memoryUsers.set(dbUser.id, {
+        const user = {
           id: dbUser.id,
           email: dbUser.email,
           password: dbUser.passwordHash,
@@ -185,24 +186,49 @@ export async function findUserByEmail(email: string) {
           image: dbUser.image || undefined,
           createdAt: dbUser.createdAt,
           updatedAt: dbUser.updatedAt
-        });
-        return memoryUsers.get(dbUser.id);
+        };
+        memoryUsers.set(dbUser.id, user);
+        return user;
       }
+      console.log('⚠️ Prisma 数据库中未找到用户');
     } catch (error: unknown) {
-      console.log('❌ 数据库查询失败:', error instanceof Error ? error.message : String(error));
+      console.log('❌ Prisma 数据库查询失败:', error instanceof Error ? error.message : String(error));
       dbConnectionFailed = true;
     }
+  } else {
+    console.log('⚠️ Prisma 数据库不可用');
   }
-  
-  // 数据库不可用时从内存查找
-  for (const user of memoryUsers.values()) {
-    if (user.email === email) {
-      console.log('👤 从内存找到用户:', email);
+
+  // 最后尝试从 Supabase REST API 查找
+  try {
+    console.log('🌐 尝试从 Supabase REST API 查找...');
+    const supabaseUser = await userOperations.findByEmail(email);
+    if (supabaseUser) {
+      console.log('✅ 从 Supabase 找到用户:', email);
+      // 同步到内存
+      const user = {
+        id: supabaseUser.id,
+        email: supabaseUser.email,
+        password: supabaseUser.password_hash || supabaseUser.password,
+        passwordHash: supabaseUser.password_hash || supabaseUser.password,
+        name: supabaseUser.name || '',
+        phone: supabaseUser.phone || '',
+        bio: supabaseUser.bio || '',
+        image: supabaseUser.image || undefined,
+        createdAt: new Date(supabaseUser.created_at),
+        updatedAt: new Date(supabaseUser.updated_at)
+      };
+      memoryUsers.set(user.id, user);
       return user;
     }
+    console.log('⚠️ Supabase 中未找到用户');
+  } catch (error) {
+    console.log('❌ Supabase 查询失败:', error instanceof Error ? error.message : String(error));
   }
-  
-  console.log('❌ 用户未找到:', email);
+
+  console.log('❌ 所有数据源都未找到用户:', email);
+  console.log('📊 当前内存用户数量:', memoryUsers.size);
+  console.log('📊 内存用户列表:', Array.from(memoryUsers.values()).map(u => u.email));
   return null;
 }
 
@@ -247,32 +273,63 @@ export async function updateUser(id: string, data: { name?: string; phone?: stri
 }
 
 export async function updateUserPassword(id: string, hashedPassword: string) {
-  const user = memoryUsers.get(id);
-  if (!user) return false;
-
-  // 更新内存中的密码
-  user.password = hashedPassword;
-  user.passwordHash = hashedPassword; // 保持兼容性
-  user.updatedAt = new Date();
-  memoryUsers.set(id, user);
-
-  // 尝试同步到Supabase数据库
+  // 首先尝试更新数据库
+  let dbUpdated = false;
   if (prisma && !dbConnectionFailed) {
     try {
-        await prisma.user.update({
-          where: { id },
-          data: { 
-            passwordHash: hashedPassword,
-            updatedAt: new Date()
-          }
-        });
-      console.log('✅ 密码已同步到Supabase数据库');
+      await prisma.user.update({
+        where: { id },
+        data: {
+          passwordHash: hashedPassword,
+          updatedAt: new Date()
+        }
+      });
+      console.log('✅ 密码已更新到数据库');
+      dbUpdated = true;
     } catch (error) {
-      console.log('⚠️ 密码同步到Supabase数据库失败:', error);
+      console.log('⚠️ 密码更新到数据库失败:', error);
+      dbConnectionFailed = true;
     }
   }
 
-  return true;
+  // 更新内存存储（无论数据库是否成功）
+  let user = memoryUsers.get(id);
+
+  // 如果内存中没有，尝试从数据库加载
+  if (!user && prisma && !dbConnectionFailed) {
+    try {
+      const dbUser = await prisma.user.findUnique({ where: { id } });
+      if (dbUser) {
+        user = {
+          id: dbUser.id,
+          email: dbUser.email,
+          password: dbUser.passwordHash,
+          passwordHash: dbUser.passwordHash,
+          name: dbUser.name || '',
+          phone: (dbUser as any).phone || '',
+          bio: (dbUser as any).bio || '',
+          image: dbUser.image || undefined,
+          createdAt: dbUser.createdAt,
+          updatedAt: dbUser.updatedAt
+        };
+      }
+    } catch (error) {
+      console.log('⚠️ 从数据库加载用户失败:', error);
+    }
+  }
+
+  if (user) {
+    // 更新内存中的密码
+    user.password = hashedPassword;
+    user.passwordHash = hashedPassword;
+    user.updatedAt = new Date();
+    memoryUsers.set(id, user);
+    console.log('✅ 密码已更新到内存存储');
+    return true;
+  }
+
+  console.log('❌ 用户不存在，无法更新密码');
+  return false;
 }
 
 // 会话操作

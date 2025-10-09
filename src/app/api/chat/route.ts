@@ -452,43 +452,56 @@ export async function POST(request: Request): Promise<Response> {
               temperature,
               presence_penalty: 0.1,
               frequency_penalty: 0.15,
-              // 提升完整性（适度增大）
-              max_tokens: 3072,
+              // 大幅提升token限制，确保回答完整性
+              max_tokens: 8192,
               stream: true,
             });
+            console.log('✅ 开始流式生成，模型:', model);
             // 累积内容用于保存
             let fullText = "";
             let tokenCount = 0;
             let buffer = "";
-            
+            let isStreamComplete = false;
+
             for await (const part of streamCompletion as any) {
               const token = part?.choices?.[0]?.delta?.content ?? "";
+              const finishReason = part?.choices?.[0]?.finish_reason;
+
+              // 检查流是否完成
+              if (finishReason) {
+                console.log(`✅ 流式生成完成，原因: ${finishReason}, 总token数: ${tokenCount}`);
+                isStreamComplete = true;
+              }
+
               if (token) {
                 fullText += token;
                 tokenCount++;
                 buffer += token;
-                
-                // 批量发送token以提高性能，每10个token或遇到标点符号时发送
-                const shouldFlush = tokenCount % 10 === 0 || 
-                  /[。！？\n]/.test(token) || 
-                  buffer.length > 50;
-                
+
+                // 批量发送token以提高性能，每5个token或遇到标点符号时发送
+                const shouldFlush = tokenCount % 5 === 0 ||
+                  /[。！？\n]/.test(token) ||
+                  buffer.length > 30;
+
                 if (shouldFlush) {
                   controller.enqueue(encoder.encode(buffer));
                   buffer = "";
                 }
-                
-                // 每50个token检查一次长度
-                if (tokenCount % 50 === 0 && fullText.length > 15000) {
-                  console.log("Stream response getting long, continuing...");
+
+                // 每100个token记录一次进度
+                if (tokenCount % 100 === 0) {
+                  console.log(`📝 已生成 ${tokenCount} tokens, ${fullText.length} 字符`);
                 }
               }
             }
-            
+
             // 发送剩余的buffer
             if (buffer) {
               controller.enqueue(encoder.encode(buffer));
+              buffer = "";
             }
+
+            console.log(`✅ 流式传输完成 - 总计: ${tokenCount} tokens, ${fullText.length} 字符`);
             // 追加参考链接（若开启联网）
             if (searchResults && searchResults.length > 0) {
               try {
@@ -580,7 +593,8 @@ export async function POST(request: Request): Promise<Response> {
         temperature,
         presence_penalty: 0.1,
         frequency_penalty: 0.2,
-        max_tokens: 2048,
+        // 大幅提升token限制，确保回答完整性
+        max_tokens: 8192,
       });
       choice = completion.choices?.[0]?.message;
       usage = (completion as any)?.usage ?? null;

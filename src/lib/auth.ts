@@ -121,12 +121,25 @@ export const authOptions: NextAuthOptions = {
             console.log("👤 Found user:", user.email);
             // 检查密码字段，优先使用 passwordHash，回退到 password
             const passwordToCheck = user.passwordHash || user.password;
+            console.log("🔑 Password field check:", {
+              hasPasswordHash: !!user.passwordHash,
+              hasPassword: !!user.password,
+              usingField: user.passwordHash ? 'passwordHash' : 'password'
+            });
+
             if (!passwordToCheck) {
               console.log("❌ No password found for user:", email);
               throw new Error("用户密码未设置");
             }
-            
+
             const isValidPassword = await bcrypt.compare(password, passwordToCheck);
+            console.log("🔐 Password validation:", {
+              email,
+              isValid: isValidPassword,
+              passwordLength: password.length,
+              hashPrefix: passwordToCheck.substring(0, 10)
+            });
+
             if (isValidPassword) {
               console.log("✅ User login successful");
               return {

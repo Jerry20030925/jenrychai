@@ -7,7 +7,16 @@ export async function GET(): Promise<Response> {
     const session = await getServerSession(authOptions as any);
     const userId = ((session as any)?.user as any)?.id || (session as any)?.userId as string | undefined;
 
+    console.log('🔍 GET /api/conversations - User ID:', userId);
+    console.log('🔍 Session details:', {
+      hasSession: !!session,
+      hasUser: !!(session as any)?.user,
+      userId: userId,
+      email: (session as any)?.user?.email
+    });
+
     if (!userId) {
+      console.log('⚠️ 用户未登录，返回空对话列表');
       return new Response(
         JSON.stringify({ conversations: [] }),
         { headers: { "Content-Type": "application/json" } }
@@ -17,6 +26,7 @@ export async function GET(): Promise<Response> {
     // 优先使用数据库，如果失败则使用内存存储
     if (prisma) {
       try {
+        console.log('📊 尝试从数据库加载对话记录...');
         const dbConversations = await prisma.conversation.findMany({
           where: { userId },
           orderBy: { updatedAt: 'desc' },
@@ -36,7 +46,7 @@ export async function GET(): Promise<Response> {
           updatedAt: conv.updatedAt.toISOString()
         }));
 
-        console.log(`✅ 从数据库加载了 ${conversations.length} 条对话记录`);
+        console.log(`✅ 从数据库加载了 ${conversations.length} 条对话记录`, conversations.slice(0, 3));
 
         return new Response(JSON.stringify({ conversations }), {
           headers: {
@@ -47,6 +57,8 @@ export async function GET(): Promise<Response> {
       } catch (dbError) {
         console.error("⚠️ 数据库查询失败，使用内存存储:", dbError);
       }
+    } else {
+      console.log('⚠️ Prisma 未初始化，使用内存存储');
     }
 
     // 回退到内存存储

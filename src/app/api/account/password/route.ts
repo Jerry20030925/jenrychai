@@ -49,17 +49,21 @@ export async function PUT(request: Request) {
           // 加密新密码
           const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-            // 更新密码到Supabase数据库
-            await prisma.user.update({
-              where: { id: userId },
-              data: { 
-                passwordHash: hashedPassword,
-                updatedAt: new Date()
-              }
-            });
+          // 更新密码到Supabase数据库
+          await prisma.user.update({
+            where: { id: userId },
+            data: {
+              passwordHash: hashedPassword,
+              updatedAt: new Date()
+            }
+          });
 
-          console.log('✅ 密码已更新到Supabase数据库');
-          return new Response(JSON.stringify({ message: '密码修改成功' }), {
+          // 同步更新内存存储（确保一致性）
+          const { updateUserPassword } = await import('@/lib/database-hybrid');
+          await updateUserPassword(userId, hashedPassword);
+
+          console.log('✅ 密码已更新到Supabase数据库和内存存储');
+          return new Response(JSON.stringify({ message: '密码修改成功，请使用新密码重新登录' }), {
             headers: { 'Content-Type': 'application/json' }
           });
         }

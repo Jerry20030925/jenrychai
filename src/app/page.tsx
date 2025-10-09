@@ -304,11 +304,13 @@ export default function HomePage() {
 
       if (reader) {
         try {
+          let chunkCount = 0;
           while (true) {
             const { done, value } = await reader.read();
+
             if (done) {
               // 流结束，清除加载状态
-              console.log('✅ Stream completed, clearing loading state');
+              console.log(`✅ Stream completed - 接收到 ${chunkCount} 个chunk, 总计 ${fullContent.length} 字符`);
               setLoading(false);
               setShowDeepThinkingFeedback(false);
               setShowWebSearchFeedback(false);
@@ -316,6 +318,7 @@ export default function HomePage() {
             }
 
             const chunk = decoder.decode(value, { stream: true });
+            chunkCount++;
             fullContent += chunk;
             buffer += chunk;
 
@@ -328,13 +331,19 @@ export default function HomePage() {
               buffer = "";
               lastUpdateTime = now;
             }
+
+            // 每100个chunk记录一次
+            if (chunkCount % 100 === 0) {
+              console.log(`📥 已接收 ${chunkCount} chunks, ${fullContent.length} 字符`);
+            }
           }
 
           // 确保最后的内容被显示
-          if (buffer) {
+          if (buffer || fullContent) {
             setMessages(prev => prev.map(m =>
               m.id === assistantId ? { ...m, content: fullContent } : m
             ));
+            console.log(`✅ 最终内容已显示，总计 ${fullContent.length} 字符`);
           }
         } catch (streamError) {
           console.error("Stream reading error:", streamError);
