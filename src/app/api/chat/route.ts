@@ -278,7 +278,9 @@ export async function POST(request: Request): Promise<Response> {
       
       // 添加常见相关查询
       if (query.includes('天气')) {
-        relatedQueries.push('天气预报', '天气查询');
+        // 为天气查询添加更具体的关键词
+        const today = new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
+        relatedQueries.push(`${today}天气`, '实时天气', '天气预报');
       }
       if (query.includes('新闻')) {
         relatedQueries.push('最新新闻', '今日新闻');
@@ -380,15 +382,18 @@ export async function POST(request: Request): Promise<Response> {
           "\n\n请结合这些搜索结果提供准确和最新的信息，并在回答末尾提供参考链接。";
       }
 
-      // 获取当前日期和时间
+      // 获取当前日期和时间 - 确保时区正确
       const now = new Date();
-      const dateString = now.toLocaleDateString('zh-CN', {
+      // 使用UTC+8时区（中国标准时间）
+      const chinaTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+      const dateString = chinaTime.toLocaleDateString('zh-CN', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-        weekday: 'long'
+        weekday: 'long',
+        timeZone: 'Asia/Shanghai'
       });
-      const currentDateTime = `当前日期时间：${dateString} ${now.toLocaleTimeString('zh-CN', { hour12: false })}`;
+      const currentDateTime = `当前日期时间：${dateString} ${chinaTime.toLocaleTimeString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })}`;
 
       const systemPrompt =
         body?.systemPrompt ||

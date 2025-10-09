@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import ConversationHistory from "./components/ConversationHistory";
+import ReferenceSources from "./components/ReferenceSources";
 import { useLanguage } from "./contexts/LanguageContext";
 
 type UiMessage = {
@@ -17,6 +18,35 @@ type UiMessage = {
     images?: string[];
     files?: Array<{ name: string; content: string }>;
   };
+  references?: Array<{ url: string; title: string }>;
+};
+
+// 解析消息内容中的参考来源
+const parseReferences = (content: string): { cleanContent: string; references: Array<{ url: string; title: string }> } => {
+  // 匹配 <ref-data> 标签中的JSON数据
+  const refDataMatch = content.match(/<ref-data>([\s\S]*?)<\/ref-data>/);
+  if (!refDataMatch) {
+    return { cleanContent: content, references: [] };
+  }
+
+  try {
+    const refData = JSON.parse(refDataMatch[1]);
+    if (refData.type === 'references' && Array.isArray(refData.data)) {
+      const references = refData.data.map((item: any) => ({
+        url: item.url || '',
+        title: item.title || ''
+      })).filter((ref: any) => ref.url && ref.title);
+      
+      // 移除 <ref-data> 标签，保留其他内容
+      const cleanContent = content.replace(/<ref-data>[\s\S]*?<\/ref-data>/, '').trim();
+      
+      return { cleanContent, references };
+    }
+  } catch (error) {
+    console.error('解析参考来源失败:', error);
+  }
+
+  return { cleanContent: content, references: [] };
 };
 
 export default function HomePage() {
@@ -350,8 +380,16 @@ export default function HomePage() {
             if (now - lastUpdateTime > UPDATE_INTERVAL || 
                 buffer.length > 10 ||  // 减少缓冲区大小
                 /[。！？\n]/.test(chunk)) {  // 遇到标点符号立即更新
+              
+              // 解析参考来源
+              const { cleanContent, references } = parseReferences(fullContent);
+              
               setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, content: fullContent } : m
+                m.id === assistantId ? { 
+                  ...m, 
+                  content: fullContent,
+                  references: references.length > 0 ? references : undefined
+                } : m
               ));
               buffer = "";
               lastUpdateTime = now;
@@ -365,8 +403,15 @@ export default function HomePage() {
 
           // 确保最后的内容被显示
           if (buffer || fullContent) {
+            // 解析最终内容的参考来源
+            const { cleanContent, references } = parseReferences(fullContent);
+            
             setMessages(prev => prev.map(m =>
-              m.id === assistantId ? { ...m, content: fullContent } : m
+              m.id === assistantId ? { 
+                ...m, 
+                content: fullContent,
+                references: references.length > 0 ? references : undefined
+              } : m
             ));
             console.log(`✅ 最终内容已显示，总计 ${fullContent.length} 字符`);
           }
@@ -489,9 +534,19 @@ export default function HomePage() {
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[rehypeHighlight]}
                     >
-                      {message.content}
+                      {parseReferences(message.content).cleanContent}
                     </ReactMarkdown>
                   </div>
+                  
+                  {/* 参考来源图标 */}
+                  {message.role === "assistant" && parseReferences(message.content).references.length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <ReferenceSources 
+                        sources={parseReferences(message.content).references}
+                        className="justify-start"
+                      />
+                    </div>
+                  )}
                   
                   {/* AI回答后的功能图标 */}
                   {message.role === "assistant" && (
