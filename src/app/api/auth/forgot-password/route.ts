@@ -1,7 +1,8 @@
-import { createHash, randomBytes } from "crypto";
+import { randomBytes } from "crypto";
 import { Resend } from "resend";
 import { PasswordResetEmail } from "@/lib/email-templates";
-import { resetTokens, users } from "@/lib/reset-tokens";
+import { prisma } from "@/lib/prisma";
+import { findUserByEmail } from "@/lib/database-hybrid";
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -11,14 +12,15 @@ export async function POST(request: Request): Promise<Response> {
       return new Response(JSON.stringify({ error: "请输入邮箱地址" }), { status: 400 });
     }
 
-    // 检查邮箱是否存在（这里简化处理，实际应该查询数据库）
-    // 为了演示，我们假设所有邮箱都可以重置密码
-    const userExists = true; // 简化处理
+    // 检查邮箱是否存在
+    const user = await findUserByEmail(email);
+    console.log("🔍 User lookup result:", user ? `Found: ${user.email}` : 'Not found');
 
-    if (!userExists) {
-      // 为了安全，即使邮箱不存在也返回成功
-      return new Response(JSON.stringify({ 
-        message: "如果该邮箱已注册，您将收到重设密码的邮件" 
+    // 为了安全，即使邮箱不存在也返回成功（防止邮箱枚举攻击）
+    if (!user) {
+      console.log("⚠️ Email not registered, but returning success for security");
+      return new Response(JSON.stringify({
+        message: "如果该邮箱已注册，您将收到重设密码的邮件"
       }), { status: 200 });
     }
 
@@ -26,18 +28,39 @@ export async function POST(request: Request): Promise<Response> {
     const token = randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 15 * 60 * 1000); // 15分钟后过期
 
-    // 存储重置令牌
-    resetTokens.set(token, {
-      email,
-      token,
-      expires
-    });
+    // 保存到数据库
+    if (prisma) {
+      try {
+        // 先删除该邮箱的所有旧令牌
+        await prisma.passwordResetToken.deleteMany({
+          where: { email }
+        });
 
-    console.log("💾 Token stored:", token);
-    console.log("📧 For email:", email);
-    console.log("⏰ Expires at:", expires);
-    console.log("📊 Total tokens in storage:", resetTokens.size);
-    console.log("🔑 All tokens:", Array.from(resetTokens.keys()).slice(0, 5));
+        // 创建新令牌
+        await prisma.passwordResetToken.create({
+          data: {
+            email,
+            token,
+            expires
+          }
+        });
+
+        console.log("💾 Token saved to database:", token);
+        console.log("📧 For email:", email);
+        console.log("⏰ Expires at:", expires);
+      } catch (dbError) {
+        console.error("❌ Failed to save token to database:", dbError);
+        // 如果数据库保存失败，仍然返回成功（安全考虑）
+        return new Response(JSON.stringify({
+          message: "如果该邮箱已注册，您将收到重设密码的邮件"
+        }), { status: 200 });
+      }
+    } else {
+      console.log("⚠️ Prisma not available, cannot store token");
+      return new Response(JSON.stringify({
+        error: "服务暂时不可用，请稍后重试"
+      }), { status: 503 });
+    }
 
     // 生成重置链接
     const resetUrl = `${process.env.NEXTAUTH_URL || 'https://jenrychai.com'}/reset-password?token=${token}`;
@@ -71,18 +94,24 @@ export async function GET(request: Request): Promise<Response> {
     const token = url.searchParams.get('token');
 
     console.log("🔍 Validating token in GET:", token);
-    console.log("📊 Available tokens:", Array.from(resetTokens.keys()).slice(0, 5));
-    console.log("📊 Total tokens in storage:", resetTokens.size);
 
     if (!token) {
       console.log("❌ No token provided");
       return new Response(JSON.stringify({ error: "缺少重置令牌" }), { status: 400 });
     }
 
-    const resetData = resetTokens.get(token);
+    if (!prisma) {
+      console.log("❌ Database not available");
+      return new Response(JSON.stringify({ error: "服务暂时不可用" }), { status: 503 });
+    }
+
+    // 从数据库查询令牌
+    const resetData = await prisma.passwordResetToken.findUnique({
+      where: { token }
+    });
 
     if (!resetData) {
-      console.log("❌ Token not found in storage");
+      console.log("❌ Token not found in database");
       return new Response(JSON.stringify({ error: "重置令牌无效或已过期" }), { status: 400 });
     }
 
@@ -93,10 +122,14 @@ export async function GET(request: Request): Promise<Response> {
 
     if (resetData.expires < now) {
       console.log("❌ Token has expired");
+      // 删除过期令牌
+      await prisma.passwordResetToken.delete({
+        where: { id: resetData.id }
+      });
       return new Response(JSON.stringify({ error: "重置令牌无效或已过期" }), { status: 400 });
     }
 
-    console.log("✅ Token is valid");
+    console.log("✅ Token is valid for email:", resetData.email);
     return new Response(JSON.stringify({
       valid: true,
       email: resetData.email
