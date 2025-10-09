@@ -70,18 +70,24 @@ export default function AccountPage() {
 
       if (response.ok) {
         const data = await response.json();
-        
-        // 如果API返回了sessionUpdate标记，更新NextAuth会话
-        if (data.sessionUpdate) {
-          console.log('🔄 更新NextAuth会话...');
-          // 使用window.location.reload()刷新页面以更新会话
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        }
-        
+
         setMessage({ type: 'success', text: '账户信息更新成功！' });
         setIsEditing(false);
+
+        // 如果API返回了sessionUpdate标记，强制刷新session
+        if (data.sessionUpdate) {
+          console.log('🔄 更新NextAuth会话...');
+          // 使用NextAuth的update方法更新session
+          const { update } = await import('next-auth/react');
+          await update({
+            name: data.name
+          });
+
+          // 延迟刷新以确保session更新
+          setTimeout(() => {
+            window.location.href = '/account';
+          }, 500);
+        }
       } else {
         const data = await response.json();
         setMessage({ type: 'error', text: data.error || '更新失败' });

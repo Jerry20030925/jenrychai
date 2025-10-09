@@ -63,10 +63,33 @@ export default function HomePage() {
     };
   }, []);
 
+  // 从数据库获取最新的用户信息
+  const [currentUserName, setCurrentUserName] = useState<string>("");
+
+  useEffect(() => {
+    // 如果已登录，从API获取最新的用户信息
+    if (session?.user?.email) {
+      fetch('/api/account')
+        .then(res => res.json())
+        .then(data => {
+          if (data.name) {
+            setCurrentUserName(data.name);
+          }
+        })
+        .catch(err => {
+          console.error('获取用户信息失败:', err);
+          // 失败时回退到session中的名字
+          setCurrentUserName(session?.user?.name || "");
+        });
+    } else {
+      setCurrentUserName("");
+    }
+  }, [session?.user?.email, session?.user?.name]);
+
   // 根据时间生成问候语
   const getTimeBasedGreeting = () => {
     const hour = new Date().getHours();
-    const userName = session?.user?.name || "";
+    const userName = currentUserName || session?.user?.name || "";
 
     let timeGreeting = "";
     if (hour >= 5 && hour < 12) {

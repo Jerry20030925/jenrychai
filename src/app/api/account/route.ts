@@ -21,6 +21,8 @@ export async function GET() {
             id: true,
             email: true,
             name: true,
+            phone: true,
+            bio: true,
             createdAt: true,
             updatedAt: true
           }
@@ -32,6 +34,8 @@ export async function GET() {
             id: user.id,
             email: user.email,
             name: user.name || '',
+            phone: (user as any).phone || '',
+            bio: (user as any).bio || '',
             createdAt: user.createdAt
           }), {
             headers: { 'Content-Type': 'application/json' }
@@ -87,26 +91,32 @@ export async function PUT(request: Request) {
           where: { id: userId },
           data: {
             name: name || null,
+            phone: phone || null,
+            bio: bio || null,
             updatedAt: new Date()
           },
           select: {
             id: true,
             email: true,
             name: true,
+            phone: true,
+            bio: true,
             updatedAt: true
           }
         });
 
         console.log('✅ 用户信息已更新到Supabase数据库');
-        
+
         // 更新内存缓存
         const { updateUser } = await import('@/lib/database-hybrid');
-        await updateUser(userId, { name });
-        
+        await updateUser(userId, { name, phone, bio });
+
         return new Response(JSON.stringify({
           id: updatedUser.id,
           email: updatedUser.email,
           name: updatedUser.name || '',
+          phone: (updatedUser as any).phone || '',
+          bio: (updatedUser as any).bio || '',
           sessionUpdate: true // 标记需要更新会话
         }), {
           headers: { 'Content-Type': 'application/json' }
